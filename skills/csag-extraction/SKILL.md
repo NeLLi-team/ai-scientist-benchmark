@@ -63,13 +63,17 @@ Important:
 
 ### Phase 1 — Core graph (always)
 1. Build `PaperExtraction` metadata (id/title/doi/pmid if available).
-2. Extract **Entities** with ontology annotations when possible.
-3. Extract **Assertions** (hypotheses, result-claims, conclusions):
+   - Resolve `doi` and `pmid` from the staged source, OCR/article outputs, TEI/XML, or local metadata whenever recoverable.
+   - If one or both cannot be resolved, record explicit `doi_status` / `pmid_status` entries in `extraction_activities.parameters` with `resolved` or `unresolved`.
+2. Extract **Artifacts** when the paper exposes figure/table/supplement captions.
+3. Extract **Datasets** when the paper exposes data-availability text, repository links, accessions, or project identifiers.
+4. Extract **Entities** with ontology annotations when possible.
+5. Extract **Assertions** (hypotheses, result-claims, conclusions):
    - must include `contexts` (≥1)
    - must include `normalization_status`
-4. Extract **EvidenceItems** (results/analyses/citations).
-5. Create **EvidenceLinks** (EvidenceItem -> Assertion) with `polarity`, `strength`, `rationale`.
-6. Add **TextSpans** grounding key Assertions/EvidenceItems/EvidenceLinks.
+6. Extract **EvidenceItems** (results/analyses/citations).
+7. Create **EvidenceLinks** (EvidenceItem -> Assertion) with `polarity`, `strength`, `rationale`.
+8. Add **TextSpans** grounding key Assertions/EvidenceItems/EvidenceLinks.
 
 ### Phase 2 — Study & experiment structure (if feasible)
 - Add `Study` and `Experiment` objects.
@@ -89,6 +93,8 @@ Unless the source is a short note/editorial with genuinely limited content, targ
 - >=2 evidence items and >=2 evidence links when present
 - >=1 inference step when reasoning combines multiple premises/evidence
 - >=1 critique/gap when explicitly discussed by authors
+- >=1 artifact when figure/table captions are present in the source
+- >=1 dataset when data-availability text, accessions, or repository links are present in the source
 
 If a category is not present in the paper, state that in `notes` for the paper/assertion rather than silently omitting it.
 
@@ -99,6 +105,10 @@ Confirm all checks:
 - Evidence links cover key claims, not only the first matched sentence.
 - At least one TextSpan anchors each non-trivial extracted object.
 - Output includes explicit statement of absent components (e.g., no clear hypothesis section).
+- `doi` / `pmid` are resolved when recoverable, or explicit `doi_status` / `pmid_status` parameters are present in `extraction_activities`.
+- `artifacts` are present when figure/table captions are present in the source.
+- `datasets` are present when data-availability text, accessions, or repository links are present in the source.
+- The repo-local validation pass succeeds.
 
 ## Anti-patterns (forbidden)
 
@@ -113,6 +123,24 @@ Confirm all checks:
 3. Anchor `TextSpan.document_id` to `pmid:<ID>` when PMID is known.
 4. If only PMCID is available, use `pmc:<ID>` and mark PMID resolution as pending in `notes`.
 5. Do not mix spans from different papers in one `PaperExtraction`; produce one extraction per source paper.
+
+## Repo-local validation hook (mandatory)
+
+Before finalizing the extraction, run:
+
+```bash
+python skills/csag-extraction/scripts/validate_paper_extraction.py \
+  /abs/path/to/paper_extraction.json \
+  --source-markdown /abs/path/to/paper.md \
+  --article-json /abs/path/to/paper.article.json \
+  --report-out /abs/path/to/paper_extraction.validation.json
+```
+
+This validation step is blocking:
+
+- do not stop after writing `paper_extraction.json`
+- do not stop after informal inspection only
+- do not stop if the validator reports missing DOI/PMID status, missing artifacts, missing datasets, or broken references
 
 ## Mandatory paper interrogation questions
 

@@ -1,98 +1,162 @@
 # Advanced Benchmark
 
-This repository is currently used for **knowledge graph generation from manuscript or publication source files**, especially PDFs.
+This repository is an internal **benchmark-authoring repo** for scientific AI evaluation.
 
-The core workflow is:
+For each case, the authoring workflow starts from:
 
-1. stage a source file under `ground_truth/<case>/data/`
-2. convert it to canonical Markdown
-3. extract a CSAG knowledge graph from that text
+1. a source manuscript PDF, DOCX, or Markdown
+2. the participant-visible starting data or explicit download instructions
 
-New work in this repository should focus on **PDF/DOCX/Markdown -> Markdown -> CSAG**.
+and produces three outputs:
 
-## Quick start
+1. a ground-truth knowledge artifact
+2. a participant-facing research-question and data package
+3. an evaluator-facing scoring schema derived from the ground truth
 
-To add one new manuscript or publication:
+The participant agents that later attempt the research do **not** work from this repo and do **not** see the ground-truth artifact.
 
-1. choose a case name such as `06-my-paper`
-2. create:
-   - `ground_truth/06-my-paper/data/`
-3. place the source file there as one of:
-   - `ground_truth/06-my-paper/data/06-my-paper.pdf`
-   - `ground_truth/06-my-paper/data/06-my-paper.docx`
-   - `ground_truth/06-my-paper/data/06-my-paper.md`
-4. run an agent from the repo root with instructions equivalent to:
+## What The User Must Provide
+
+For a new case named `<case>`, the user should provide:
+
+- the manuscript or publication source file under `ground_truth/<case>/data/`
+- the participant-visible starting data under `ground_truth/<case>/starting_data/`
+
+The starting data can include any mix of:
+
+- local files such as assemblies, transcriptomes, annotations, or tables
+- accession numbers that can be downloaded later
+- repository IDs or project IDs
+- download instructions for data that participants are allowed to use
+
+The manuscript is used to generate the ground-truth knowledge artifact.
+The starting data are used to build the participant package and must be safe to expose to future participant agents.
+
+## What This Repo Generates
+
+For each case, this repo should generate:
+
+- `csag/`
+  - the ground-truth knowledge artifact and validation report
+- `prompt/`
+  - a research question
+  - a participant prompt that points only to participant-visible data
+- `scoring/`
+  - a machine-readable scoring schema
+  - a human-readable scoring rubric
+  - evaluator instructions
+- `exports/participant/`
+  - the participant-facing package only
+- `exports/evaluator/`
+  - the evaluator-facing package only
+
+## Case Layout
+
+The intended forward-looking layout for one case is:
 
 ```text
-Use the repo-local AGENTS.md.
-
-The source document is staged at:
-ground_truth/06-my-paper/data/06-my-paper.pdf
-
-Use the repo-local `paper-to-md` skill to create:
-- ground_truth/06-my-paper/data/06-my-paper.md
-
-Then use the repo-local `csag-extraction` skill to create:
-- ground_truth/06-my-paper/csag/raw_paper.json
-- ground_truth/06-my-paper/csag/paper_extraction.json
-
-Do not create prompts, reproduction artifacts, or benchmark evaluation material unless explicitly asked.
-```
-
-## Repository layout
-
-The main working layout is:
-
-```text
-ground_truth/
-  <case>/
-    data/
-      <case>.pdf | <case>.docx | <case>.md
-      <case>.md
-    csag/
-      raw_paper.json
-      paper_extraction.json
+ground_truth/<case>/
+  data/
+    <case>.pdf | <case>.docx | <case>.md
+    <case>.md
+    <case>.section_audit.json
+    <case>.article.json
+  starting_data/
+    manifest.yaml
+    download_instructions.md
+    files/...
+  csag/
+    raw_paper.json
+    paper_extraction.json
+    paper_extraction.validation.json
+  prompt/
+    research_question.md
+    participant_prompt.md
+    participant_package_manifest.json
+  scoring/
+    scoring_schema.json
+    scoring_rubric.md
+    evaluator_instructions.md
+  exports/
+    participant/
+    evaluator/
 ```
 
 Notes:
 
-- the original source stays under `data/`
-- the canonical Markdown also lives under `data/`
-- the CSAG knowledge graph lives under `csag/`
+- `data/` is the manuscript-to-ground-truth path.
+- `starting_data/` is the participant-visible scientific starting point.
+- `csag/` is internal ground truth.
+- `prompt/` and `exports/participant/` are what future participant agents should receive.
+- `scoring/` and `exports/evaluator/` are what the evaluator should receive.
 
-## What this repo does
+Some older files in the repository still reflect an earlier benchmark or reproduction workflow. Treat them as legacy context unless you are explicitly migrating them.
 
-For new work, this repo does:
+## Authoring Workflow
 
-- source staging under `ground_truth/<case>/data/`
-- PDF or DOCX normalization to Markdown
-- CSAG knowledge graph extraction from the canonical text
+For a new case:
 
-For new work, this repo does **not** require:
+1. stage the manuscript under `ground_truth/<case>/data/`
+2. stage participant-visible starting data under `ground_truth/<case>/starting_data/`
+3. run `paper-to-md`
+4. run `csag-extraction`
+5. generate the participant prompt package
+6. generate the scoring schema package
+7. export participant-facing and evaluator-facing subsets
 
-- reproduction of published results
-- runtime benchmarking
-- prompt packaging
-- evaluation reference writeups
-
-Some older files in the repository may still reflect an earlier benchmark-oriented workflow. Keep them intact unless you are explicitly asked to migrate them.
-
-## Skills used here
-
-The expected skill order is:
+The expected repo-local skill order is:
 
 1. `paper-to-md`
 2. `csag-extraction`
+3. `benchmark-prompt-package`
+4. `benchmark-scoring`
 
-Use `csag-light` only when a compact projection is explicitly requested in addition to the full graph.
+## Authoring Agent Prompt
 
-## Acceptance checklist
+Use a prompt like this from the repo root:
 
-A new knowledge-graph case is ready when:
+```text
+Use the repo-local AGENTS.md.
 
-- the source file exists under `ground_truth/<case>/data/`
-- `ground_truth/<case>/data/<case>.md` exists
-- `ground_truth/<case>/csag/raw_paper.json` exists
-- `ground_truth/<case>/csag/` contains a full CSAG extraction
+Case name: <case>
 
-That is the default scope for this repository right now.
+The manuscript source is staged at:
+ground_truth/<case>/data/<case>.pdf
+
+The participant-visible starting data are staged at:
+ground_truth/<case>/starting_data/
+
+Run the repo-local workflow to create:
+- canonical Markdown plus paper-to-md sidecars
+- a ground-truth CSAG knowledge artifact plus validation report
+- a participant-facing research question and prompt package that only points to participant-visible data
+- an evaluator-facing scoring schema package derived from the ground-truth artifact
+
+Do not include the manuscript PDF, CSAG ground truth, or scoring files in the participant export.
+Do not assume participant agents can see this repository.
+```
+
+## Downstream Evaluation Flow
+
+The intended benchmark loop is:
+
+1. This repo authors a case from manuscript + starting data.
+2. A participant agent outside this repo receives only the participant export.
+3. The participant agent performs independent research from the starting data and writes a manuscript PDF.
+4. A separate evaluator agent independently converts that candidate manuscript PDF into a candidate knowledge artifact.
+5. The evaluator applies the scoring schema from this repo to compare the candidate artifact against the ground-truth artifact.
+
+This repo is therefore for **authoring ground truth, participant prompts, and scoring assets**, not for running the participant research agents themselves.
+
+## Acceptance Checklist
+
+A case is ready when:
+
+- the manuscript source exists under `ground_truth/<case>/data/`
+- the participant-visible data manifest exists under `ground_truth/<case>/starting_data/`
+- the canonical Markdown and `paper-to-md` sidecars exist
+- the CSAG artifact and validation report exist
+- the participant prompt package exists
+- the scoring schema package exists
+- the participant export excludes ground-truth-only assets
+- the evaluator export includes the scoring assets needed for comparison

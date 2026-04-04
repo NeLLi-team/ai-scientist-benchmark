@@ -140,6 +140,16 @@ Both services use:
    - `<stem>.section_audit.json`
    - `<stem>.article.json`
 
+   If `figure_interpretation` matters for the task or if the paper is figure-heavy, also render relevant PDF pages to PNG with the repo-local helper:
+
+   ```bash
+   python skills/paper-to-md/scripts/render_pdf_pages_to_png.py \
+     /path/to/input.pdf \
+     --output-dir /path/to/output-dir/figure_review
+   ```
+
+   Then inspect the rendered PNGs directly before finalizing `figure_interpretation`.
+
    Important requirement:
 
    - do **not** stop after generating the section audit only
@@ -198,6 +208,10 @@ For scientific papers, add and validate:
 - `<stem>.section_audit.json`
 - `<stem>.article.json`
 
+Optional but recommended when figures matter:
+
+- `figure_review/` with rendered PDF page PNGs produced by `skills/paper-to-md/scripts/render_pdf_pages_to_png.py`
+
 ## Structuring guidance
 
 When creating `<stem>.article.json`:
@@ -233,7 +247,8 @@ When structuring the OCR Markdown into the schema:
   - capture figure or table captions as one list item per caption
   - support caption starters like `Fig.`, `Figure`, `Table`, `Supplementary Figure`, and `Supplementary Table`
 - `figure_interpretation`
-  - only populate when the OCR text itself supports a concise interpretation without guessing
+  - only populate when the OCR text or reviewed figure page PNGs support a concise interpretation without guessing
+  - when figure interpretation is important, prefer rendering the relevant PDF pages to PNG and inspecting them directly rather than inferring from captions alone
 - `references`
   - extract one entry per cited item when a references section is present
 

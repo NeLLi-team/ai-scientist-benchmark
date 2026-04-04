@@ -3,3 +3,15 @@ docs
 tasks
 scripts
 ground_truth/*
+!skills/csag-extraction/scripts/
+skills/csag-extraction/scripts/*
+!skills/csag-extraction/scripts/validate_paper_extraction.py
+!skills/benchmark-prompt-package/scripts/
+skills/benchmark-prompt-package/scripts/*
+!skills/benchmark-prompt-package/scripts/build_prompt_package.py
+!skills/benchmark-scoring/scripts/
+skills/benchmark-scoring/scripts/*
+!skills/benchmark-scoring/scripts/build_scoring_package.py
+!skills/paper-to-md/scripts/
+skills/paper-to-md/scripts/*
+!skills/paper-to-md/scripts/render_pdf_pages_to_png.py
