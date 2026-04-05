@@ -95,14 +95,7 @@ Both services use:
    - `references/gksyn_article_schema.md`
    - `references/article.yaml`
 
-4. Optional: scaffold a blank schema JSON with:
-
-   ```bash
-   python skills/paper-to-md/scripts/scaffold_article_json.py \
-     /path/to/output-dir/document.md
-   ```
-
-5. Build the mandatory section audit with:
+4. Build the mandatory section audit with:
 
    ```bash
    python skills/paper-to-md/scripts/build_section_audit.py \
@@ -120,7 +113,7 @@ Both services use:
    - which fields are already populated or still missing
    - which source headings or front-matter regions justify each field
 
-6. Create a first-pass populated schema JSON from the OCR Markdown with:
+5. Create a first-pass populated schema JSON from the OCR Markdown with:
 
    ```bash
    python skills/paper-to-md/scripts/populate_article_json.py \
@@ -130,19 +123,18 @@ Both services use:
    Notes:
 
    - this step may create `<stem>.article.json` directly
-   - if you already created a blank scaffold, this step should overwrite it with a populated first pass
    - the populate helper is a starting point, not a substitute for review
 
    Important note:
 
    - this step also refreshes `<stem>.section_audit.json`
 
-7. Review and refine both:
+6. Review and refine both:
 
    - `<stem>.section_audit.json`
    - `<stem>.article.json`
 
-   If `figure_interpretation` matters for the task or if the paper is figure-heavy, also render relevant PDF pages to PNG with the repo-local helper:
+   If the paper exposes figure or table captions, render the relevant PDF pages to PNG with the repo-local helper:
 
    ```bash
    python skills/paper-to-md/scripts/render_pdf_pages_to_png.py \
@@ -155,11 +147,11 @@ Both services use:
    Important requirement:
 
    - do **not** stop after generating the section audit only
-   - do **not** stop after generating the blank scaffold
    - do **not** stop after generating Markdown only
+   - for scientific papers with figure or table captions, the task is not complete until `figure_interpretation` has been filled from direct figure review or an explicit no-interpretation exception is justified
    - for scientific papers, the task is only complete once the JSON is filled from the Markdown and validated against the section audit
 
-8. Validate the populated JSON with:
+7. Validate the populated JSON with:
 
    ```bash
    python skills/paper-to-md/scripts/validate_article_json.py \
@@ -168,7 +160,7 @@ Both services use:
      --section-audit /path/to/output-dir/document.section_audit.json
    ```
 
-9. If validation fails, fix the JSON and rerun validation.
+8. If validation fails, fix the JSON and rerun validation.
 
 ## Scientific literature rule
 
@@ -193,8 +185,8 @@ The paper workflow is not complete if:
 
 - `section_audit.json` is missing
 - `article.json` is missing
-- `article.json` is only a blank scaffold
 - `article.json` has not been validated against the section audit
+- `figure_interpretation` is empty even though figure/table captions were recoverable from the paper
 - the work stopped at Markdown without schema structuring
 
 ## Expected outputs
@@ -210,7 +202,7 @@ For scientific papers, add and validate:
 - `<stem>.section_audit.json`
 - `<stem>.article.json`
 
-Optional but recommended when figures matter:
+Required when figures or tables are recoverable:
 
 - `figure_review/` with rendered PDF page PNGs produced by `skills/paper-to-md/scripts/render_pdf_pages_to_png.py`
 
@@ -249,8 +241,9 @@ When structuring the OCR Markdown into the schema:
   - capture figure or table captions as one list item per caption
   - support caption starters like `Fig.`, `Figure`, `Table`, `Supplementary Figure`, and `Supplementary Table`
 - `figure_interpretation`
-  - only populate when the OCR text or reviewed figure page PNGs support a concise interpretation without guessing
-  - when figure interpretation is important, prefer rendering the relevant PDF pages to PNG and inspecting them directly rather than inferring from captions alone
+  - populate this for scientific papers when figures or tables are recoverable
+  - ground it in the OCR text plus reviewed figure page PNGs
+  - do not guess beyond what the captions and visible figure content support
 - `references`
   - extract one entry per cited item when a references section is present
 
@@ -268,6 +261,7 @@ Usually also non-empty when recoverable:
 - `abstract`
 - `methods`
 - `figure_legends`
+- `figure_interpretation`
 - `references`
 
 If the OCR Markdown clearly contains one of these and the JSON field is still empty, the output is not complete.
@@ -312,7 +306,6 @@ The repo-local files for this skill are:
 - `skills/paper-to-md/scripts/ocr_api_job.py`
 - `skills/paper-to-md/scripts/build_section_audit.py`
 - `skills/paper-to-md/scripts/populate_article_json.py`
-- `skills/paper-to-md/scripts/scaffold_article_json.py`
 - `skills/paper-to-md/scripts/validate_article_json.py`
 - `skills/paper-to-md/scripts/render_pdf_pages_to_png.py`
 - `skills/paper-to-md/scripts/article_extraction.py`

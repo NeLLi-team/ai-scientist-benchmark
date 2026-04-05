@@ -43,7 +43,7 @@ For a staged manuscript plus starting data source:
    - `ground_truth/<case>/data/<case>.md`
    - `ground_truth/<case>/data/<case>.section_audit.json`
    - `ground_truth/<case>/data/<case>.article.json`
-4. if `figure_interpretation` matters, use the repo-local `paper-to-md` helper to render relevant PDF pages to PNG and inspect the images directly before finalizing `ground_truth/<case>/data/<case>.article.json`
+4. if the paper exposes figure or table captions, use the repo-local `paper-to-md` helper to render relevant PDF pages to PNG and inspect the images directly before finalizing `ground_truth/<case>/data/<case>.article.json`
 5. create `ground_truth/<case>/csag/`
 6. create:
    - `ground_truth/<case>/csag/raw_paper.json`

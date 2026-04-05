@@ -99,6 +99,7 @@ For a new case:
 1. stage the manuscript under `ground_truth/<case>/data/`
 2. stage participant-visible starting data under `ground_truth/<case>/starting_data/`
 3. run `paper-to-md`
+   - for scientific papers with recoverable figures or tables, render relevant PDF pages to PNG and use them to populate `figure_interpretation`
 4. run `csag-extraction`
 5. generate the participant prompt package
 6. generate the scoring schema package

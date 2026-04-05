@@ -630,7 +630,7 @@ def build_section_audit(markdown_path: Path) -> dict:
         "methods": audit_string_field(bool(method_headings), methods, source="section_run", headings=method_headings),
         "main": audit_string_field(True, main_text, source="section_runs", headings=main_headings),
         "figure_legends": audit_list_field(bool(figure_legends), figure_legends, source="caption_scan"),
-        "figure_interpretation": audit_string_field(False, "", source="manual_only"),
+        "figure_interpretation": audit_string_field(bool(figure_legends), "", source="figure_review_required"),
         "references": audit_list_field(bool(reference_headings), references, source="section_run", headings=reference_headings),
     }
 
