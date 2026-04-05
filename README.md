@@ -4,7 +4,7 @@ This repository is an internal **benchmark-authoring repo** for scientific AI ev
 
 For each case, the authoring workflow starts from:
 
-1. a source manuscript PDF, DOCX, or Markdown
+1. a source manuscript PDF
 2. the participant-visible starting data or explicit download instructions
 
 and produces three outputs:
@@ -29,6 +29,7 @@ The starting data can include any mix of:
 - repository IDs or project IDs
 - download instructions for data that participants are allowed to use
 
+The manuscript should start from PDF so figure pages can be rendered and reviewed during artifact generation.
 The manuscript is used to generate the ground-truth knowledge artifact.
 The starting data are used to build the participant package and must be safe to expose to future participant agents.
 
@@ -79,7 +80,7 @@ The intended forward-looking layout for one case is:
 ```text
 ground_truth/<case>/
   data/
-    <case>.pdf | <case>.docx | <case>.md
+    <case>.pdf
     <case>.md
     <case>.section_audit.json
     <case>.article.json

@@ -1,11 +1,11 @@
 ---
-name: pdf-docx-to-md
-description: Convert local PDF or DOCX files to Markdown through the local OCR API service. For scientific papers, the required end state is not just Markdown: convert through the API first, then structure the OCR result into the local Article schema references and validate the populated article JSON.
+name: pdf-to-md
+description: Convert local PDF files to Markdown through the local OCR API service. For scientific papers, the required end state is not just Markdown: convert through the API first, then structure the OCR result into the local Article schema references and validate the populated article JSON.
 ---
 
-# PDF DOCX To Markdown
+# PDF To Markdown
 
-Use this skill when a local PDF or DOCX should be converted to Markdown through the OCR API service on this machine.
+Use this skill when a local PDF should be converted to Markdown through the OCR API service on this machine.
 
 This repo-local skill is self-contained under `skills/paper-to-md/`.
 
@@ -34,7 +34,7 @@ This skill has two modes:
 1. Generic document mode:
    Produce Markdown only.
 2. Scientific literature mode:
-   Convert the PDF or DOCX to Markdown through the OCR API first, then structure that Markdown into a populated schema-aligned article JSON for papers, preprints, and journal articles.
+   Convert the PDF to Markdown through the OCR API first, then structure that Markdown into a populated schema-aligned article JSON for papers, preprints, and journal articles.
 
 ## Completion rule
 
@@ -42,7 +42,7 @@ For a scientific paper, the task is not complete after OCR and is not complete a
 
 The minimum complete workflow is:
 
-1. convert the PDF or DOCX to Markdown through the OCR API
+1. convert the PDF to Markdown through the OCR API
 2. create a `section_audit.json` that states which schema sections were detected and which are still missing
 3. create a schema-aligned article JSON from that audit
 4. validate the populated JSON against both the schema shape and the section audit

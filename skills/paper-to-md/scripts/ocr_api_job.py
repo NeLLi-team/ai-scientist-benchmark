@@ -46,7 +46,7 @@ def curl_download(url: str, *, api_key: str, output_path: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Submit a PDF or DOCX to the OCR API service, poll the async job, and download Markdown/JSON artifacts."
+        description="Submit a PDF to the OCR API service, poll the async job, and download Markdown/JSON artifacts."
     )
     parser.add_argument("input_path", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)

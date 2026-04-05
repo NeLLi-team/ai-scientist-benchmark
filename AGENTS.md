@@ -16,8 +16,6 @@ When the user provides a new benchmark case named `<case>`:
 
 - stage the manuscript source under:
   - `ground_truth/<case>/data/<case>.pdf`
-  - or `ground_truth/<case>/data/<case>.docx`
-  - or `ground_truth/<case>/data/<case>.md`
 - stage participant-visible starting data under:
   - `ground_truth/<case>/starting_data/`
 
@@ -75,7 +73,7 @@ For a new case named `<case>`, the forward-looking minimum layout is:
 ```text
 ground_truth/<case>/
   data/
-    <case>.pdf | <case>.docx | <case>.md
+    <case>.pdf
     <case>.md
     <case>.section_audit.json
     <case>.article.json
@@ -100,7 +98,7 @@ ground_truth/<case>/
     evaluator/
 ```
 
-If the source arrives as Markdown already, still keep it under `data/` and use that as the canonical source for ground-truth extraction.
+The supported benchmark-authoring path starts from PDF so figure pages can be rendered and reviewed.
 
 ## Skills To Use
 
@@ -139,14 +137,6 @@ If the input is a PDF:
 - use the repo-local `paper-to-md` skill
 - keep the canonical Markdown in `ground_truth/<case>/data/<case>.md`
 - do not treat the `paper-to-md` step as complete until the skill's scientific-paper sidecars exist and validate:
-  - `ground_truth/<case>/data/<case>.section_audit.json`
-  - `ground_truth/<case>/data/<case>.article.json`
-
-If the input is a DOCX:
-
-- place it in `ground_truth/<case>/data/`
-- still normalize to `ground_truth/<case>/data/<case>.md`
-- still complete the `paper-to-md` scientific-paper sidecars when the source is a scientific paper:
   - `ground_truth/<case>/data/<case>.section_audit.json`
   - `ground_truth/<case>/data/<case>.article.json`
 
@@ -249,7 +239,7 @@ The intended downstream flow is:
 
 Before stopping, confirm:
 
-- the source PDF or DOCX is stored under `ground_truth/<case>/data/`
+- the source PDF is stored under `ground_truth/<case>/data/`
 - `ground_truth/<case>/starting_data/manifest.yaml` exists
 - `ground_truth/<case>/starting_data/download_instructions.md` exists
 - `ground_truth/<case>/data/<case>.md` exists
