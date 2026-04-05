@@ -9,6 +9,26 @@ Use this skill when a local PDF or DOCX should be converted to Markdown through 
 
 This repo-local skill is self-contained under `skills/paper-to-md/`.
 
+## Runtime setup
+
+From the repo root:
+
+```bash
+uv sync
+```
+
+Run the helper scripts with:
+
+```bash
+uv run python ...
+```
+
+This skill still depends on:
+
+- the local OCR API service at `http://127.0.0.1:8002/ocr`
+- a valid `OCR_API_KEY` or equivalent API access
+- `curl` on `PATH`
+
 This skill has two modes:
 
 1. Generic document mode:
@@ -83,7 +103,7 @@ Both services use:
 1. Submit the file to the OCR API with:
 
    ```bash
-   python skills/paper-to-md/scripts/ocr_api_job.py \
+   uv run python skills/paper-to-md/scripts/ocr_api_job.py \
      /path/to/input.pdf \
      --output-dir /path/to/output-dir
    ```
@@ -98,7 +118,7 @@ Both services use:
 4. Build the mandatory section audit with:
 
    ```bash
-   python skills/paper-to-md/scripts/build_section_audit.py \
+   uv run python skills/paper-to-md/scripts/build_section_audit.py \
      /path/to/output-dir/document.md
    ```
 
@@ -116,7 +136,7 @@ Both services use:
 5. Create a first-pass populated schema JSON from the OCR Markdown with:
 
    ```bash
-   python skills/paper-to-md/scripts/populate_article_json.py \
+   uv run python skills/paper-to-md/scripts/populate_article_json.py \
      /path/to/output-dir/document.md
    ```
 
@@ -137,7 +157,7 @@ Both services use:
    If the paper exposes figure or table captions, render the relevant PDF pages to PNG with the repo-local helper:
 
    ```bash
-   python skills/paper-to-md/scripts/render_pdf_pages_to_png.py \
+   uv run python skills/paper-to-md/scripts/render_pdf_pages_to_png.py \
      /path/to/input.pdf \
      --output-dir /path/to/output-dir/figure_review
    ```
@@ -154,7 +174,7 @@ Both services use:
 7. Validate the populated JSON with:
 
    ```bash
-   python skills/paper-to-md/scripts/validate_article_json.py \
+   uv run python skills/paper-to-md/scripts/validate_article_json.py \
      /path/to/output-dir/document.article.json \
      --scientific-paper \
      --section-audit /path/to/output-dir/document.section_audit.json

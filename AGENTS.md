@@ -32,6 +32,8 @@ Before making changes:
 - read `tasks/lessons.md` if it exists
 - read the active section in `tasks/todo.md`
 - inspect one existing `ground_truth/<case>/` tree to match repo style
+- ensure the repo uv environment is available via `uv sync`
+- assume the active workflow is run via `uv run python ...`
 
 ## Required Workflow
 
@@ -112,6 +114,12 @@ Use these repo-local skills in this order:
 For this repository, active workflow helper scripts belong under the owning skill.
 Do not add new root-level workflow scripts when a skill-local helper is the correct home.
 Treat `paper-to-md` as self-contained under `skills/paper-to-md/`.
+
+The active workflow is intended to run from the repo's uv-managed environment, with these remaining external runtime requirements:
+
+- access to the local OCR API service at `http://127.0.0.1:8002/ocr`
+- a valid `OCR_API_KEY` or equivalent API access
+- `curl` on `PATH` for the OCR helper
 
 ## Scope Limits
 

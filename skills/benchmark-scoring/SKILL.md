@@ -13,6 +13,20 @@ Use this skill when a benchmark-authoring case already has:
 
 and the repo needs the **evaluator-facing scoring package**.
 
+## Runtime setup
+
+From the repo root:
+
+```bash
+uv sync
+```
+
+Run the helper with:
+
+```bash
+uv run python ...
+```
+
 ## Required outputs
 
 For one case `<case>`, produce:
@@ -31,6 +45,6 @@ The scoring package is derived from the ground-truth knowledge artifact and is n
 Use the helper script:
 
 ```bash
-python skills/benchmark-scoring/scripts/build_scoring_package.py \
+uv run python skills/benchmark-scoring/scripts/build_scoring_package.py \
   /abs/path/to/ground_truth/<case>
 ```

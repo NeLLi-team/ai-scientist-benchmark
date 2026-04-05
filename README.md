@@ -50,6 +50,28 @@ For each case, this repo should generate:
 - `exports/evaluator/`
   - the evaluator-facing package only
 
+## Runtime Setup
+
+From the repo root, the active workflow should be run from the uv-managed environment:
+
+```bash
+uv sync
+```
+
+Then run helper scripts with:
+
+```bash
+uv run python ...
+```
+
+Current non-repo runtime dependencies that still remain by design:
+
+- access to the local OCR API service at `http://127.0.0.1:8002/ocr`
+- a valid `OCR_API_KEY` or equivalent API access
+- `curl` on `PATH` for the OCR helper
+
+The PDF page renderer used for figure review is now Python-based and comes from the uv-managed environment rather than a system `pdftoppm` dependency.
+
 ## Case Layout
 
 The intended forward-looking layout for one case is:
@@ -98,11 +120,11 @@ For a new case:
 
 1. stage the manuscript under `ground_truth/<case>/data/`
 2. stage participant-visible starting data under `ground_truth/<case>/starting_data/`
-3. run `paper-to-md`
+3. run `paper-to-md` from the uv-managed environment
    - for scientific papers with recoverable figures or tables, render relevant PDF pages to PNG and use them to populate `figure_interpretation`
-4. run `csag-extraction`
-5. generate the participant prompt package
-6. generate the scoring schema package
+4. run `csag-extraction` from the uv-managed environment
+5. generate the participant prompt package from the uv-managed environment
+6. generate the scoring schema package from the uv-managed environment
 7. export participant-facing and evaluator-facing subsets
 
 The expected repo-local skill order is:

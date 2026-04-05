@@ -13,6 +13,20 @@ Use this skill when a benchmark-authoring case already has:
 
 and the repo needs the **participant-facing package**.
 
+## Runtime setup
+
+From the repo root:
+
+```bash
+uv sync
+```
+
+Run the helper with:
+
+```bash
+uv run python ...
+```
+
 ## Required outputs
 
 For one case `<case>`, produce:
@@ -39,7 +53,7 @@ The participant package must **not** expose:
 Use the helper script:
 
 ```bash
-python skills/benchmark-prompt-package/scripts/build_prompt_package.py \
+uv run python skills/benchmark-prompt-package/scripts/build_prompt_package.py \
   /abs/path/to/ground_truth/<case> \
   --research-question "..."
 ```

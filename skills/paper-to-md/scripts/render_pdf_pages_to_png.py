@@ -4,8 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 from pathlib import Path
+
+import pypdfium2 as pdfium
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,24 +44,27 @@ def render_pages(args: argparse.Namespace) -> list[Path]:
         raise SystemExit(f"Input PDF does not exist: {input_pdf}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    prefix_path = output_dir / args.prefix
+    pdf = pdfium.PdfDocument(str(input_pdf))
+    page_count = len(pdf)
 
-    cmd = ["pdftoppm", "-png", "-r", str(args.dpi)]
-    if args.first_page is not None:
-        cmd.extend(["-f", str(args.first_page)])
-    if args.last_page is not None:
-        cmd.extend(["-l", str(args.last_page)])
-    cmd.extend([str(input_pdf), str(prefix_path)])
-
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise SystemExit(result.stderr.strip() or result.stdout.strip() or "pdftoppm failed")
+    first_page = args.first_page or 1
+    last_page = args.last_page or page_count
+    if first_page > page_count:
+        raise SystemExit(f"--first-page {first_page} exceeds PDF page count {page_count}")
+    if last_page > page_count:
+        last_page = page_count
 
     pattern = re.compile(rf"^{re.escape(args.prefix)}-(\d+)\.png$")
-    pngs = []
-    for path in sorted(output_dir.glob(f"{args.prefix}-*.png")):
-        if pattern.match(path.name):
-            pngs.append(path)
+    pngs: list[Path] = []
+    scale = args.dpi / 72.0
+    for page_number in range(first_page, last_page + 1):
+        page = pdf[page_number - 1]
+        bitmap = page.render(scale=scale)
+        image = bitmap.to_pil()
+        output_path = output_dir / f"{args.prefix}-{page_number}.png"
+        image.save(output_path)
+        if pattern.match(output_path.name):
+            pngs.append(output_path)
     if not pngs:
         raise SystemExit("No PNG files were produced")
     return pngs

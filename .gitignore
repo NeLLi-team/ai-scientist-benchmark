@@ -3,3 +3,4 @@ docs
 tasks
 ground_truth/*
 __pycache__/
+.venv/
