@@ -111,6 +111,10 @@ The expected repo-local skill order is:
 3. `benchmark-prompt-package`
 4. `benchmark-scoring`
 
+Active workflow helper scripts should live under the owning skill directory.
+Do not treat a root-level `scripts/` directory as the default place for new workflow logic.
+The `paper-to-md` skill should be self-contained under `skills/paper-to-md/`.
+
 ## Authoring Agent Prompt
 
 Use a prompt like this from the repo root:

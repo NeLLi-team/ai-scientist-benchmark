@@ -7,6 +7,8 @@ description: Convert local PDF or DOCX files to Markdown through the local OCR A
 
 Use this skill when a local PDF or DOCX should be converted to Markdown through the OCR API service on this machine.
 
+This repo-local skill is self-contained under `skills/paper-to-md/`.
+
 This skill has two modes:
 
 1. Generic document mode:
@@ -81,7 +83,7 @@ Both services use:
 1. Submit the file to the OCR API with:
 
    ```bash
-   python /home/fschulz/bester-hosting/skills/pdf-docx-to-md/scripts/ocr_api_job.py \
+   python skills/paper-to-md/scripts/ocr_api_job.py \
      /path/to/input.pdf \
      --output-dir /path/to/output-dir
    ```
@@ -96,14 +98,14 @@ Both services use:
 4. Optional: scaffold a blank schema JSON with:
 
    ```bash
-   python /home/fschulz/bester-hosting/skills/pdf-docx-to-md/scripts/scaffold_article_json.py \
+   python skills/paper-to-md/scripts/scaffold_article_json.py \
      /path/to/output-dir/document.md
    ```
 
 5. Build the mandatory section audit with:
 
    ```bash
-   python /home/fschulz/bester-hosting/skills/pdf-docx-to-md/scripts/build_section_audit.py \
+   python skills/paper-to-md/scripts/build_section_audit.py \
      /path/to/output-dir/document.md
    ```
 
@@ -121,7 +123,7 @@ Both services use:
 6. Create a first-pass populated schema JSON from the OCR Markdown with:
 
    ```bash
-   python /home/fschulz/bester-hosting/skills/pdf-docx-to-md/scripts/populate_article_json.py \
+   python skills/paper-to-md/scripts/populate_article_json.py \
      /path/to/output-dir/document.md
    ```
 
@@ -160,7 +162,7 @@ Both services use:
 8. Validate the populated JSON with:
 
    ```bash
-   python /home/fschulz/bester-hosting/skills/pdf-docx-to-md/scripts/validate_article_json.py \
+   python skills/paper-to-md/scripts/validate_article_json.py \
      /path/to/output-dir/document.article.json \
      --scientific-paper \
      --section-audit /path/to/output-dir/document.section_audit.json
@@ -301,17 +303,18 @@ Before populating the article JSON:
 - preserve scientific content verbatim where possible
 - do not aggressively rewrite equations, references, or headings just to make them prettier
 
-## Source references
+## Repo-local files
 
-The local schema references for this skill are:
+The repo-local files for this skill are:
 
-- `/home/fschulz/bester-hosting/skills/pdf-docx-to-md/references/gksyn_article_schema.md`
-- `/home/fschulz/bester-hosting/skills/pdf-docx-to-md/references/article.yaml`
-
-The upstream provenance for those references is:
-
-- `/home/fschulz/dev/gksyn/03pdfextraction/README.md`
-- `/home/fschulz/dev/gksyn/03pdfextraction/schemas/article.yaml`
-- `/home/fschulz/dev/gksyn/03pdfextraction/src/schemas/article_model.py`
+- `skills/paper-to-md/references/gksyn_article_schema.md`
+- `skills/paper-to-md/references/article.yaml`
+- `skills/paper-to-md/scripts/ocr_api_job.py`
+- `skills/paper-to-md/scripts/build_section_audit.py`
+- `skills/paper-to-md/scripts/populate_article_json.py`
+- `skills/paper-to-md/scripts/scaffold_article_json.py`
+- `skills/paper-to-md/scripts/validate_article_json.py`
+- `skills/paper-to-md/scripts/render_pdf_pages_to_png.py`
+- `skills/paper-to-md/scripts/article_extraction.py`
 
 The condensed instructions needed for normal use are already captured in `references/gksyn_article_schema.md`. Use the local copied `references/article.yaml` when you need the exact LinkML shape. Only read the upstream source files directly if you need to verify edge cases beyond the local references.

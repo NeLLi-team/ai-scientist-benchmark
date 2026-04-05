@@ -109,6 +109,10 @@ Use these repo-local skills in this order:
 3. `benchmark-prompt-package`
 4. `benchmark-scoring`
 
+For this repository, active workflow helper scripts belong under the owning skill.
+Do not add new root-level workflow scripts when a skill-local helper is the correct home.
+Treat `paper-to-md` as self-contained under `skills/paper-to-md/`.
+
 ## Scope Limits
 
 Unless the user explicitly asks otherwise, do **not** create or update:
