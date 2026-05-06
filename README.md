@@ -173,7 +173,9 @@ The `ground_truth` profile requires stronger structural integrity:
 - assertion `criticality`
 - assertion `falsification_criteria`
 - evidence links for non-background assertions
-- text-span grounding for core and major assertions, either on the assertion or linked evidence item
+- decisive support/refutation for non-background assertions
+- text-span grounding for non-background assertions, either on the assertion or linked evidence item
+- at least moderate decisive evidence for core and major assertions, unless the assertion is explicitly a limitation or speculation
 
 For a case ground truth, use:
 
@@ -194,6 +196,7 @@ The scoring package is derived from the ground-truth CSAG. Assertion checks incl
 - `falsification_criteria`
 - linked evidence IDs
 - evidence strengths
+- required evidence strength
 - a required flag
 - a weight multiplier
 

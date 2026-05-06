@@ -55,6 +55,7 @@ class BuildScoringPackageTest(unittest.TestCase):
         self.assertEqual(check["falsification_criteria"], ["No independent increase in the measured outcome."])
         self.assertEqual(check["evidence_link_ids"], [evidence_link_id])
         self.assertEqual(check["evidence_strengths"], ["strong"])
+        self.assertEqual(check["required_evidence_strength"], "moderate")
         self.assertEqual(check["weight_multiplier"], 2.0)
         self.assertTrue(check["required"])
 

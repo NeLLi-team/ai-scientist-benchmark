@@ -111,7 +111,9 @@ Confirm all checks:
 - `artifacts` are present when figure/table captions are present in the source.
 - `datasets` are present when data-availability text, accessions, or repository links are present in the source.
 - The repo-local validation pass succeeds.
-- For benchmark ground truth, run validation with `--profile ground_truth` and resolve all strict assertion/evidence checks.
+- For benchmark ground truth, run validation with `--profile ground_truth` and resolve all strict assertion/evidence/reference checks.
+- For benchmark ground truth, every non-background assertion should have decisive evidence and assertion/evidence text-span grounding.
+- Core and major assertions should have at least moderate decisive evidence unless explicitly marked as `limitation` or `speculation`.
 
 ## Anti-patterns (forbidden)
 

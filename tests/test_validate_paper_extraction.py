@@ -132,6 +132,89 @@ class ValidatePaperExtractionTest(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["profile"], "ground_truth")
 
+    def test_candidate_profile_rejects_dangling_artifact_references(self) -> None:
+        extraction = base_extraction()
+        extraction["artifacts"] = [
+            {
+                "id": "csag:doc/test/artifact/F0001",
+                "artifact_type": "figure",
+                "artifact_label": "Figure 1",
+            }
+        ]
+        extraction["evidence_items"][0]["associated_artifacts"] = ["csag:doc/test/artifact/MISSING"]
+
+        result, report = self.run_validator(extraction, "candidate")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ok"])
+        self.assertIn("associated_artifacts references missing id", "\n".join(report["errors"]))
+
+    def test_ground_truth_profile_requires_grounding_for_supporting_assertions(self) -> None:
+        extraction = base_extraction()
+        assertion = extraction["assertions"][0]
+        assertion["criticality"] = "supporting"
+        assertion["falsification_criteria"] = [
+            "The claim is weakened if independent analysis shows no increase in the measured outcome."
+        ]
+        extraction["evidence_links"][0]["strength"] = "moderate"
+        extraction["evidence_links"][0]["rationale"] = "The measured increase supports the assertion."
+
+        result, report = self.run_validator(extraction, "ground_truth")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ok"])
+        self.assertIn("lacks assertion/evidence text_spans", "\n".join(report["errors"]))
+
+    def test_ground_truth_profile_rejects_core_claim_with_only_weak_evidence(self) -> None:
+        extraction = base_extraction()
+        assertion = extraction["assertions"][0]
+        assertion["criticality"] = "core"
+        assertion["falsification_criteria"] = [
+            "The claim is weakened if independent analysis shows no increase in the measured outcome."
+        ]
+        assertion["text_spans"] = [
+            {
+                "id": "csag:doc/test/span/A0001",
+                "document_id": "csag:doc/test",
+                "section_type": "results",
+                "start_char": 0,
+                "end_char": 42,
+            }
+        ]
+        extraction["evidence_links"][0]["strength"] = "weak"
+        extraction["evidence_links"][0]["rationale"] = "The measured increase weakly supports the assertion."
+
+        result, report = self.run_validator(extraction, "ground_truth")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(report["ok"])
+        self.assertIn("has no strong enough decisive evidence_link", "\n".join(report["errors"]))
+
+    def test_ground_truth_profile_allows_weak_evidence_for_explicit_limitation(self) -> None:
+        extraction = base_extraction()
+        assertion = extraction["assertions"][0]
+        assertion["claim_role"] = "limitation"
+        assertion["criticality"] = "major"
+        assertion["falsification_criteria"] = [
+            "The limitation is weakened if independent analysis shows the measured outcome is fully resolved."
+        ]
+        assertion["text_spans"] = [
+            {
+                "id": "csag:doc/test/span/A0001",
+                "document_id": "csag:doc/test",
+                "section_type": "discussion",
+                "start_char": 0,
+                "end_char": 42,
+            }
+        ]
+        extraction["evidence_links"][0]["strength"] = "weak"
+        extraction["evidence_links"][0]["rationale"] = "The evidence weakly supports this limitation."
+
+        result, report = self.run_validator(extraction, "ground_truth")
+
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(report["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

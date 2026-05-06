@@ -22,6 +22,7 @@ ASSERTION_CRITICALITIES = {"core", "major", "supporting", "background"}
 DECISIVE_POLARITIES = {"supports", "refutes", "mixed"}
 POLARITIES = DECISIVE_POLARITIES | {"inconclusive"}
 STRENGTH_LEVELS = {"very_strong", "strong", "moderate", "weak", "very_weak", "unknown"}
+ADEQUATE_STRENGTH_LEVELS = {"very_strong", "strong", "moderate"}
 ID_LIST_KEYS = (
     "artifacts",
     "datasets",
@@ -137,6 +138,28 @@ def expect_refs(refs: object, known_ids: set[str], message_prefix: str, errors: 
             expect(ref in known_ids, f"{message_prefix} references missing id {ref}", errors)
 
 
+def validate_nested_artifact_refs(value: object, artifact_ids: set[str], path: str, errors: list[str]) -> None:
+    if isinstance(value, dict):
+        if "artifact_ref" in value:
+            expect_optional_ref(
+                value.get("artifact_ref"),
+                artifact_ids,
+                f"{path}.artifact_ref references missing id {value.get('artifact_ref')}",
+                errors,
+            )
+        if "associated_artifacts" in value:
+            expect_refs(value.get("associated_artifacts"), artifact_ids, f"{path}.associated_artifacts", errors)
+        for key, item in value.items():
+            validate_nested_artifact_refs(item, artifact_ids, f"{path}.{key}", errors)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            validate_nested_artifact_refs(item, artifact_ids, f"{path}[{index}]", errors)
+
+
+def is_limitation_or_speculation(assertion: dict) -> bool:
+    return assertion.get("claim_role") in {"limitation", "speculation"}
+
+
 def validate_optional_assertion_metadata(extraction: dict, errors: list[str]) -> None:
     for item in extraction.get("assertions", []) or []:
         if not isinstance(item, dict):
@@ -161,6 +184,18 @@ def validate_cross_references(extraction: dict, ids_by_key: dict[str, set[str]],
     assertion_ids = ids_by_key.get("assertions", set())
     evidence_ids = ids_by_key.get("evidence_items", set())
     evidence_link_ids = ids_by_key.get("evidence_links", set())
+    artifact_ids = ids_by_key.get("artifacts", set())
+    experiment_ids = ids_by_key.get("experiments", set())
+
+    validate_nested_artifact_refs(extraction, artifact_ids, "paper_extraction", errors)
+
+    for item in extraction.get("evidence_items", []) or []:
+        expect_optional_ref(
+            item.get("associated_experiment"),
+            experiment_ids,
+            f"evidence_item {item.get('id')} references missing associated_experiment {item.get('associated_experiment')}",
+            errors,
+        )
 
     for item in extraction.get("evidence_links", []) or []:
         expect_required_ref(
@@ -291,7 +326,6 @@ def validate_ground_truth_profile(extraction: dict, ids_by_key: dict[str, set[st
         )
         if criticality != "background":
             expect(bool(links), f"assertion {assertion_id} has no evidence_links", errors)
-        if criticality in {"core", "major"}:
             expect(
                 any(link.get("polarity") in DECISIVE_POLARITIES for link in links),
                 f"assertion {assertion_id} has no decisive evidence_link",
@@ -300,6 +334,16 @@ def validate_ground_truth_profile(extraction: dict, ids_by_key: dict[str, set[st
             expect(
                 has_text_spans(assertion) or any(has_text_spans(item) for item in linked_evidence),
                 f"assertion {assertion_id} lacks assertion/evidence text_spans",
+                errors,
+            )
+        if criticality in {"core", "major"} and not is_limitation_or_speculation(assertion):
+            expect(
+                any(
+                    link.get("polarity") in DECISIVE_POLARITIES
+                    and link.get("strength") in ADEQUATE_STRENGTH_LEVELS
+                    for link in links
+                ),
+                f"assertion {assertion_id} has no strong enough decisive evidence_link",
                 errors,
             )
 

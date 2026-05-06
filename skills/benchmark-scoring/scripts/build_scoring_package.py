@@ -24,6 +24,13 @@ CRITICALITY_WEIGHTS = {
     "background": 0.5,
 }
 
+REQUIRED_EVIDENCE_STRENGTH = {
+    "core": "moderate",
+    "major": "moderate",
+    "supporting": "decisive",
+    "background": "",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the evaluator-facing scoring package for one benchmark case.")
@@ -58,6 +65,15 @@ def assertion_required(assertion: dict) -> bool:
     if criticality in CRITICALITY_WEIGHTS:
         return criticality != "background"
     return assertion.get("claim_role") != "objective"
+
+
+def required_evidence_strength(assertion: dict) -> str:
+    criticality = assertion.get("criticality")
+    if criticality in REQUIRED_EVIDENCE_STRENGTH:
+        return REQUIRED_EVIDENCE_STRENGTH[criticality]
+    if assertion.get("claim_role") in {"discovery", "conclusion", "result_claim"}:
+        return "decisive"
+    return ""
 
 
 def evidence_links_by_assertion(extraction: dict) -> dict[str, list[dict]]:
@@ -103,6 +119,7 @@ def build_schema(case: str, extraction: dict, research_question: str, starting_m
                 "evidence_strengths": [
                     link.get("strength", "") for link in links_by_assertion.get(item.get("id"), [])
                 ],
+                "required_evidence_strength": required_evidence_strength(item),
                 "weight_multiplier": assertion_weight(item),
                 "required": assertion_required(item),
             }
