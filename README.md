@@ -17,14 +17,9 @@ The participant agents that later attempt the research do **not** work from this
 
 ## Tracked Code And Local Data
 
-The repository tracks workflow code, schemas, tests, and public documentation. Benchmark case data and local reference material are intentionally ignored:
+The repository tracks workflow code, schemas, tests, and public documentation. Private benchmark case data, local reference material, and working notes are intentionally ignored.
 
-- `ground_truth/*`
-- `06mega/`
-- `refs/`
-- `tasks/`
-
-Use those ignored locations for private manuscripts, generated case artifacts, local reference papers, and working notes. Do not rely on ignored local files being available in another checkout.
+Before staging, check `git status --ignored` and make sure ignored local inputs, generated case artifacts, local reference papers, and working notes are not added. Do not rely on ignored local files being available in another checkout.
 
 ## What The User Must Provide
 

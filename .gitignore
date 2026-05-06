@@ -2,7 +2,5 @@ DEL
 docs
 tasks
 ground_truth/*
-06mega/
-refs/
 __pycache__/
 .venv/

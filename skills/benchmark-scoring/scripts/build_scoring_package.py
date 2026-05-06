@@ -201,7 +201,7 @@ def build_evaluator_instructions(schema: dict) -> str:
         "3. Compare the candidate artifact to the ground-truth scoring schema in `scoring_schema.json`.\n"
         "4. Score the candidate across the weighted dimensions.\n"
         "5. Apply contradiction and hallucination penalties after the base score is computed.\n\n"
-        "The participant package is intentionally incomplete with respect to the ground truth. Score only against the output manuscript and its independently derived candidate artifact, not against the participant's hidden reasoning traces.\n"
+        "The participant package is intentionally incomplete with respect to the ground truth. Score only against the output manuscript and its independently derived candidate artifact, not against hidden intermediate notes.\n"
     )
 
 
