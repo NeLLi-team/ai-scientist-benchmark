@@ -192,6 +192,11 @@ def should_drop_line(text: str, counts: Counter[str]) -> bool:
 def load_clean_lines(markdown_path: Path) -> list[str]:
     raw_text = markdown_path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
     raw_lines = [line.rstrip() for line in raw_text.split("\n")]
+    if raw_lines and raw_lines[0].strip() == "---":
+        for index in range(1, len(raw_lines)):
+            if raw_lines[index].strip() == "---":
+                raw_lines = raw_lines[index + 1 :]
+                break
     counts = Counter(normalize_count_key(line) for line in raw_lines if normalize_count_key(line))
 
     cleaned: list[str] = []

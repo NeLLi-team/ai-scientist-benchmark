@@ -109,6 +109,18 @@ enums:
       limitation: {}
       future_work: {}
 
+  AssertionCriticality:
+    description: Benchmark/evaluation importance of an assertion.
+    permissible_values:
+      core:
+        description: Load-bearing claim required for the benchmark ground truth.
+      major:
+        description: Important claim that materially affects interpretation or scoring.
+      supporting:
+        description: Useful supporting claim, method detail, or contextual result.
+      background:
+        description: Background or framing claim not usually required for participant success.
+
   AssertionType:
     description: Semantic type of an assertion.
     permissible_values:
@@ -742,6 +754,17 @@ slots:
   assertion_text:
     range: string
     description: Natural-language form of the assertion, close to author wording.
+    in_subset: [phase1]
+
+  criticality:
+    range: AssertionCriticality
+    description: Evaluation importance of the assertion for ground-truth and scoring use.
+    in_subset: [phase1]
+
+  falsification_criteria:
+    range: string
+    multivalued: true
+    description: Concrete observations or analyses that would weaken, refute, or require revising the assertion.
     in_subset: [phase1]
 
   claim_role:
@@ -1453,6 +1476,8 @@ classes:
       - ExtractedItem
     slots:
       - assertion_text
+      - criticality
+      - falsification_criteria
       - claim_role
       - assertion_type
       - normalization_status

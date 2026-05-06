@@ -177,6 +177,7 @@ The CSAG extraction must also satisfy these repository rules:
 - if the staged source or `paper-to-md` outputs expose figure or table captions, include `artifacts` in `paper_extraction.json`
 - if the staged source exposes data-availability text, repository links, accessions, or project identifiers, include `datasets` in `paper_extraction.json`
 - run the repo-local validator at `skills/csag-extraction/scripts/validate_paper_extraction.py` before stopping
+- use `--profile ground_truth` for benchmark ground-truth artifacts
 
 The extracted graph should be derived from the canonical Markdown or the staged text source, not from memory.
 

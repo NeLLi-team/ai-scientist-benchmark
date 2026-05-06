@@ -17,6 +17,13 @@ WEIGHTS = {
     "limitations_and_uncertainty": 10,
 }
 
+CRITICALITY_WEIGHTS = {
+    "core": 2.0,
+    "major": 1.5,
+    "supporting": 1.0,
+    "background": 0.5,
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the evaluator-facing scoring package for one benchmark case.")
@@ -33,6 +40,9 @@ def load_yaml(path: Path) -> dict:
 
 
 def assertion_weight(assertion: dict) -> float:
+    criticality = assertion.get("criticality")
+    if criticality in CRITICALITY_WEIGHTS:
+        return CRITICALITY_WEIGHTS[criticality]
     role = assertion.get("claim_role")
     if role == "objective":
         return 0.5
@@ -43,11 +53,28 @@ def assertion_weight(assertion: dict) -> float:
     return 1.0
 
 
+def assertion_required(assertion: dict) -> bool:
+    criticality = assertion.get("criticality")
+    if criticality in CRITICALITY_WEIGHTS:
+        return criticality != "background"
+    return assertion.get("claim_role") != "objective"
+
+
+def evidence_links_by_assertion(extraction: dict) -> dict[str, list[dict]]:
+    links_by_assertion: dict[str, list[dict]] = {}
+    for link in extraction.get("evidence_links", []):
+        assertion_id = link.get("assertion")
+        if assertion_id:
+            links_by_assertion.setdefault(assertion_id, []).append(link)
+    return links_by_assertion
+
+
 def build_schema(case: str, extraction: dict, research_question: str, starting_manifest: dict) -> dict:
     assertions = extraction.get("assertions", [])
     entities = extraction.get("entities", [])
     datasets = extraction.get("datasets", [])
     critiques = extraction.get("critiques", [])
+    links_by_assertion = evidence_links_by_assertion(extraction)
 
     return {
         "case_id": case,
@@ -67,9 +94,17 @@ def build_schema(case: str, extraction: dict, research_question: str, starting_m
                 "assertion_id": item.get("id"),
                 "label": item.get("label"),
                 "claim_role": item.get("claim_role"),
+                "criticality": item.get("criticality", ""),
                 "assertion_text": item.get("assertion_text"),
+                "falsification_criteria": item.get("falsification_criteria", []),
+                "evidence_link_ids": [
+                    link.get("id") for link in links_by_assertion.get(item.get("id"), []) if link.get("id")
+                ],
+                "evidence_strengths": [
+                    link.get("strength", "") for link in links_by_assertion.get(item.get("id"), [])
+                ],
                 "weight_multiplier": assertion_weight(item),
-                "required": item.get("claim_role") != "objective",
+                "required": assertion_required(item),
             }
             for item in assertions
         ],
@@ -129,6 +164,8 @@ def build_rubric(schema: dict) -> str:
             "## Evaluation Guidance",
             "",
             "- Score claim coverage against the ground-truth assertion set, with stronger emphasis on discoveries and conclusions.",
+            "- Treat core and major assertions as load-bearing; missing or contradicting them should dominate claim-coverage decisions.",
+            "- Use falsification criteria to identify participant statements or omissions that would weaken otherwise plausible claim matches.",
             "- Score evidence and method alignment based on whether the participant manuscript supports its claims with methods and evidence compatible with the ground-truth artifact.",
             "- Score entity and dataset coverage on whether the participant work identifies the key biological objects and starting-data anchors.",
             "- Score quantitative fidelity when the participant manuscript reproduces or faithfully discusses major quantitative relationships.",

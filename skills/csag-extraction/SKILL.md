@@ -71,6 +71,8 @@ Important:
 5. Extract **Assertions** (hypotheses, result-claims, conclusions):
    - must include `contexts` (≥1)
    - must include `normalization_status`
+   - for benchmark ground truth, include `criticality` (`core`, `major`, `supporting`, or `background`)
+   - for benchmark ground truth, include `falsification_criteria` describing what would weaken or refute the assertion
 6. Extract **EvidenceItems** (results/analyses/citations).
 7. Create **EvidenceLinks** (EvidenceItem -> Assertion) with `polarity`, `strength`, `rationale`.
 8. Add **TextSpans** grounding key Assertions/EvidenceItems/EvidenceLinks.
@@ -109,6 +111,7 @@ Confirm all checks:
 - `artifacts` are present when figure/table captions are present in the source.
 - `datasets` are present when data-availability text, accessions, or repository links are present in the source.
 - The repo-local validation pass succeeds.
+- For benchmark ground truth, run validation with `--profile ground_truth` and resolve all strict assertion/evidence checks.
 
 ## Anti-patterns (forbidden)
 
@@ -131,6 +134,7 @@ Before finalizing the extraction, run:
 ```bash
 python skills/csag-extraction/scripts/validate_paper_extraction.py \
   /abs/path/to/paper_extraction.json \
+  --profile ground_truth \
   --source-markdown /abs/path/to/paper.md \
   --article-json /abs/path/to/paper.article.json \
   --report-out /abs/path/to/paper_extraction.validation.json
@@ -148,12 +152,16 @@ Before finalizing a `PaperExtraction`, answer these (internally or as `qa_items`
 - What are the paper's hypotheses/research questions/objectives?
 - What are the primary result claims and conclusions/discoveries?
 - What evidence supports each key claim, and what evidence (if any) refutes it?
+- Which assertions are core, major, supporting, or background for benchmark evaluation?
+- What observation or analysis would falsify or seriously weaken each core/major assertion?
 - What inference/mechanistic chains connect evidence to conclusions?
 - What limitations/flaws are stated or strongly implied?
 - What open knowledge gaps/future-work items are stated?
 
 Map answers to CSAG objects:
 - hypotheses/results/conclusions -> `assertions`
+- benchmark importance -> assertion `criticality`
+- falsifiability checks -> assertion `falsification_criteria`
 - support/refute -> `evidence_links`
 - reasoning chains -> `inferences`
 - limitations -> `critiques`
