@@ -115,8 +115,8 @@ Treat `paper-to-md` as self-contained under `skills/paper-to-md/`.
 
 The active workflow is intended to run from the repo's uv-managed environment, with these remaining external runtime requirements:
 
-- access to the local OCR API service at `http://127.0.0.1:8002/ocr`
-- a valid `OCR_API_KEY` or equivalent API access
+- access to the OCR API service — the helper auto-detects local (`http://127.0.0.1:8002/ocr`) vs remote (`https://api.newlineages.com/ocr`). Override with `OCR_BASE_URL` env var or `--base-url`.
+- a valid API key in `OCR_API_KEY` or `NELLI_API_KEY` (both are checked, in that order)
 - `curl` on `PATH` for the OCR helper
 
 ## Scope Limits

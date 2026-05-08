@@ -73,8 +73,8 @@ uv run python ...
 
 Current non-repo runtime dependencies that still remain by design:
 
-- access to the local OCR API service at `http://127.0.0.1:8002/ocr`
-- a valid `OCR_API_KEY` or equivalent API access
+- access to the OCR API service — either locally at `http://127.0.0.1:8002/ocr` (on the OCR host) or remotely at `https://api.newlineages.com/ocr` (via Cloudflare tunnel). The helper script auto-detects the route; set `OCR_BASE_URL` to pin one.
+- a valid API key in `OCR_API_KEY` or `NELLI_API_KEY` (both env vars are checked)
 - `curl` on `PATH` for the OCR helper
 
 The PDF page renderer used for figure review is now Python-based and comes from the uv-managed environment rather than a system `pdftoppm` dependency.

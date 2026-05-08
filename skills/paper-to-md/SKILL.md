@@ -25,8 +25,8 @@ uv run python ...
 
 This skill still depends on:
 
-- the local OCR API service at `http://127.0.0.1:8002/ocr`
-- a valid `OCR_API_KEY` or equivalent API access
+- the OCR API service (auto-detected; see "OCR API path" below)
+- a valid API key in `OCR_API_KEY` or `NELLI_API_KEY` (or passed via `--api-key`)
 - `curl` on `PATH`
 
 This skill has two modes:
@@ -51,14 +51,38 @@ Markdown alone is insufficient for a scientific-paper task under this skill.
 
 ## OCR API path
 
-The OCR API path is:
+The OCR API has two routes depending on where you are running:
 
-- local base URL: `http://127.0.0.1:8002/ocr`
-- public-compatible path prefix: `/ocr/...`
+| Route | Base URL | When to use |
+|-------|----------|-------------|
+| Local | `http://127.0.0.1:8002/ocr` | Running directly on the OCR host (Bester) |
+| Remote | `https://api.newlineages.com/ocr` | Running from any other machine (via Cloudflare tunnel) |
+
+The helper script **auto-detects** the correct route:
+
+1. If `--base-url` is passed, use that.
+2. If `OCR_BASE_URL` env var is set, use that.
+3. Probe `http://127.0.0.1:8002/ocr/health` — if it responds, use local.
+4. Otherwise fall back to `https://api.newlineages.com/ocr`.
+
+To pin a route without passing `--base-url` every time, set `OCR_BASE_URL`:
+
+```bash
+export OCR_BASE_URL="https://api.newlineages.com/ocr"
+```
 
 Important note:
 
 - the current default backend behind this API is LightOnOCR-2-1B on the A6000
+
+The remote route goes through:
+
+```
+https://api.newlineages.com/ocr/...
+  -> Cloudflare tunnel
+  -> Bester local http://127.0.0.1:8001
+  -> OCR API http://127.0.0.1:8002/ocr
+```
 
 The API is served locally by:
 
@@ -77,14 +101,19 @@ That wrapper uses the local LightOn OCR model service at:
 
 The OCR API expects `X-API-Key`.
 
-Default environment variable for the helper script:
+The helper script checks these sources in order:
 
-- `OCR_API_KEY`
+1. `--api-key` argument (highest priority)
+2. `OCR_API_KEY` environment variable
+3. `NELLI_API_KEY` environment variable
 
-If that is not set, either:
+Set whichever is convenient:
 
-- pass `--api-key` directly to the helper script
-- or create/use a valid API key for the OCR API service
+```bash
+export OCR_API_KEY="<your-key>"
+# or equivalently:
+export NELLI_API_KEY="<your-key>"
+```
 
 Important auth note:
 

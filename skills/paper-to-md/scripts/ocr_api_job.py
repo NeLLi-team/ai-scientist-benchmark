@@ -9,21 +9,40 @@ import sys
 import time
 from pathlib import Path
 
-DEFAULT_BASE_URL = "http://127.0.0.1:8002/ocr"
-DEFAULT_API_KEY_ENV = "OCR_API_KEY"
+LOCAL_BASE_URL = "http://127.0.0.1:8002/ocr"
+REMOTE_BASE_URL = "https://api.newlineages.com/ocr"
+API_KEY_ENV_VARS = ("OCR_API_KEY", "NELLI_API_KEY")
+BASE_URL_ENV = "OCR_BASE_URL"
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, capture_output=True, text=True, check=False)
 
 
+def resolve_base_url(explicit: str | None) -> str:
+    """Return the OCR base URL from explicit arg, env var, or auto-detection."""
+    if explicit:
+        return explicit
+    env_url = os.getenv(BASE_URL_ENV, "").strip()
+    if env_url:
+        return env_url
+    # Auto-detect: try local first, fall back to remote
+    probe = run(["curl", "-sf", "-o", "/dev/null", "-w", "%{http_code}",
+                  f"{LOCAL_BASE_URL}/health"])
+    if probe.returncode == 0 and probe.stdout.strip().startswith("2"):
+        return LOCAL_BASE_URL
+    return REMOTE_BASE_URL
+
+
 def require_api_key(args: argparse.Namespace) -> str:
     if args.api_key:
         return args.api_key
-    key = os.getenv(args.api_key_env, "").strip()
-    if key:
-        return key
-    raise SystemExit(f"Missing OCR API key. Set {args.api_key_env} or pass --api-key.")
+    for env_var in API_KEY_ENV_VARS:
+        key = os.getenv(env_var, "").strip()
+        if key:
+            return key
+    names = " or ".join(API_KEY_ENV_VARS)
+    raise SystemExit(f"Missing OCR API key. Set {names} or pass --api-key.")
 
 
 def curl_json(url: str, *, api_key: str, method: str = "GET", form_file: Path | None = None) -> dict:
@@ -50,9 +69,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("input_path", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
-    parser.add_argument("--api-key", default=None)
-    parser.add_argument("--api-key-env", default=DEFAULT_API_KEY_ENV)
+    parser.add_argument("--base-url", default=None,
+                        help="OCR API base URL. Auto-detected from OCR_BASE_URL env, "
+                             "local health probe, or remote fallback if not provided.")
+    parser.add_argument("--api-key", default=None,
+                        help="OCR API key. Falls back to OCR_API_KEY / NELLI_API_KEY env vars.")
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--poll-interval-seconds", type=int, default=2)
     return parser.parse_args()
@@ -67,7 +88,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     api_key = require_api_key(args)
-    base_url = args.base_url.rstrip("/")
+    base_url = resolve_base_url(args.base_url).rstrip("/")
 
     create_payload = curl_json(
         f"{base_url}/api/jobs",
