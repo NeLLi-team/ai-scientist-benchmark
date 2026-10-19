@@ -143,6 +143,13 @@ The expected repo-local skill order is:
 3. `benchmark-prompt-package`
 4. `benchmark-scoring`
 
+### Blinded variants and reference-database hygiene
+
+Two `benchmark-prompt-package` helpers support blinded runs of an authored case:
+
+- `blind_case.py SOURCE DEST --seed S --participant-prompt FILE --research-question Q` copies the source starting data to `DEST` with seeded neutral file names (`assembly_A`, `assembly_B`, ...) and contig names (`assembly_X_contig_NNNN`). Sequence lines are unchanged. It writes the participant prompt package, `exports/participant/`, `case.yaml` (reused ground truth with SHA-256) and `private/blinding_map.json` (alias, original file, hashes, header map). The private map must never enter an export. The script fails if an original ID appears in the participant-visible files.
+- `filter_reference_db.py SRC DEST --drop ID... --fasta F... --tsv F...` copies a local reference database without the records of the named genomes (FASTA by header, TSV by first column; whole-token match). Mount the filtered copy instead of the original in blinded runs. `DEST` must be new or empty and must not lie inside `SRC`; it refuses symlinked destination subdirectories, absolute file names and `..`, so it never writes to `SRC`.
+
 Active workflow helper scripts should live under the owning skill directory.
 Do not treat a root-level `scripts/` directory as the default place for new workflow logic.
 The `paper-to-md` skill should be self-contained under `skills/paper-to-md/`.
