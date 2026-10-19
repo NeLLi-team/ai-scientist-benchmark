@@ -225,7 +225,7 @@ The scoring schema should support:
 
 ## Evaluation Flow Rule
 
-This repo is for benchmark authoring, not for running the participant agents.
+This repo is for benchmark authoring. The one exception is the `benchmark-run` skill, which runs native Codex CLI and Claude Code participants in a pinned container against an exported participant package.
 
 The intended downstream flow is:
 

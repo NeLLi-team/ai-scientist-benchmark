@@ -246,7 +246,34 @@ The intended benchmark loop is:
 4. A separate evaluator agent independently converts that candidate manuscript PDF into a candidate knowledge artifact.
 5. The evaluator applies the scoring schema from this repo to compare the candidate artifact against the ground-truth artifact.
 
-This repo is therefore for **authoring ground truth, participant prompts, and scoring assets**, not for running the participant research agents themselves.
+This repo is therefore for **authoring ground truth, participant prompts, and scoring assets**. The one exception is the `benchmark-run` skill, which launches native Codex CLI and Claude Code participants in a container (next section).
+
+## Running Participants
+
+The `benchmark-run` skill runs one native participant, Codex CLI or Claude Code, against a case that already has its participant export. Each run happens in a pinned Docker container that sees only the starting data (read-only), a work directory, a private HOME and the read-only reference databases. A watchdog stops the container at 3 hours or at 10 GB received.
+
+Build the image once, then start one run per setup:
+
+```bash
+skills/benchmark-run/docker/build.sh
+
+uv run python skills/benchmark-run/scripts/run_participant.py \
+  --setup codex \
+  --case-dir ground_truth/<case> \
+  --run-dir <empty-dir-on-a-posix-filesystem> \
+  --gv-exports-filtered <case-specific-filtered-gv-exports>
+```
+
+Use `--setup claude` for Claude Code. The run directory ends up with `transcript.jsonl`, `stderr.log`, `work/deliverable/manuscript.md`, and `run.json` (versions, models, image id, limits, stop reason, network bytes, token usage, deliverable hashes). Credentials are copied into the run's private HOME with mode 0600 and deleted when the run ends.
+
+After a run, scan it for terms that must not appear (original IDs, paper-only names, the paper title):
+
+```bash
+uv run python skills/benchmark-run/scripts/audit_leakage.py \
+  --terms-file <private-terms.txt> --run-dir <run-dir>
+```
+
+The terms file stays private and the report prints term ids, never terms. `skills/benchmark-run/SKILL.md` has the full run contract and known limits. Test with `uv run python -m unittest discover -s tests`; the container tests use a stub agent and skip when the image is missing.
 
 ## Acceptance Checklist
 
