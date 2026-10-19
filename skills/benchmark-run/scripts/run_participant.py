@@ -27,6 +27,7 @@ from collections.abc import Generator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 import container_watchdog
 import run_credentials
@@ -686,6 +687,86 @@ def run_participant(config: RunConfig, case: CaseFiles, credentials_src: Path) -
     return record
 
 
+class RunResult(NamedTuple):
+    """One finished run: its directory and the run.json content."""
+
+    run_dir: Path
+    record: dict
+
+
+def run_series(
+    config: RunConfig, case: CaseFiles, credentials_src: Path, *, repeat: int
+) -> list[RunResult]:
+    """Run the participant `repeat` times in a row.
+
+    One repeat runs in `config.run_dir` itself. More than one run in
+    `r01` ... `rNN` below it, each a normal run with its own `run.json`, and
+    `repeats.json` lists them. The series stops at the first interrupted or
+    failed run; `repeats.json` is still written and the failure is raised again.
+    """
+    if repeat == 1:
+        return [
+            RunResult(config.run_dir, run_participant(config, case, credentials_src))
+        ]
+    parent = config.run_dir
+    check_run_dir(parent)
+    parent.mkdir(parents=True, exist_ok=True)
+    results: list[RunResult] = []
+    entries: list[dict] = []
+    failure: BaseException | None = None
+    for index in range(1, repeat + 1):
+        name = f"r{index:02d}"
+        run_config = dataclasses.replace(config, run_dir=parent / name)
+        try:
+            record = run_participant(run_config, case, credentials_src)
+        except BaseException as err:  # noqa: BLE001  # listed in repeats.json, then raised again below
+            failure = err
+            entries.append(_failed_entry(name, run_config.run_dir))
+            break
+        results.append(RunResult(run_config.run_dir, record))
+        entries.append(_series_entry(name, record))
+        if record["stop_reason"] in ("interrupted", "runner_error") or record["error"]:
+            break
+    with _signals_blocked():
+        run_report.write_json_atomic(
+            parent / "repeats.json",
+            {
+                "schema_version": SCHEMA_VERSION,
+                "setup": config.setup.name,
+                "requested": repeat,
+                "runs": entries,
+            },
+        )
+    if failure is not None:
+        raise failure
+    return results
+
+
+def _series_entry(name: str, record: dict) -> dict:
+    """The repeats.json row for one run."""
+    return {
+        "run": name,
+        "run_json": f"{name}/run.json",
+        "stop_reason": record["stop_reason"],
+        "exit_code": record["exit_code"],
+        "elapsed_s": record["elapsed_s"],
+    }
+
+
+def _failed_entry(name: str, run_dir: Path) -> dict:
+    """The repeats.json row for a run that raised; `run.json` may be missing."""
+    run_json = run_dir / "run.json"
+    if not run_json.is_file():
+        return {
+            "run": name,
+            "run_json": None,
+            "stop_reason": "runner_error",
+            "exit_code": None,
+            "elapsed_s": None,
+        }
+    return _series_entry(name, _loads(run_json.read_text(encoding="utf-8")))
+
+
 @contextlib.contextmanager
 def _signals_blocked() -> Generator[None]:
     """Hold SIGINT and SIGTERM until cleanup is done; they arrive afterwards."""
@@ -799,8 +880,26 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=Path,
         help="Test only: executable mounted over the real CLI.",
     )
+    parser.add_argument(
+        "--repeat",
+        type=_positive_int,
+        default=1,
+        help="Run N times in a row into <run-dir>/r01 ... rNN and write "
+        "<run-dir>/repeats.json (default 1: one run in <run-dir>).",
+    )
     _add_limit_args(parser)
     return parser.parse_args(argv)
+
+
+def _positive_int(text: str) -> int:
+    """Parse an argparse value that must be a whole number of at least one."""
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{value} is below 1")
+    return value
 
 
 def _add_limit_args(parser: argparse.ArgumentParser) -> None:
@@ -903,7 +1002,7 @@ def config_from_args(args: argparse.Namespace) -> tuple[RunConfig, CaseFiles, Pa
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one participant.
+    """Run one participant, or `--repeat` of them in a row.
 
     Returns 0 when the run finished and `run.json` was written, 130 when it was
     interrupted, 1 when the watchdog hit an internal error, and 2 on a setup error.
@@ -915,7 +1014,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     previous_handler = signal.signal(signal.SIGTERM, _raise_interrupt)
     try:
         config, case, credentials = config_from_args(args)
-        record = run_participant(config, case, credentials)
+        results = run_series(config, case, credentials, repeat=args.repeat)
     except RunnerError as err:
         print(f"run_participant: {err}", file=sys.stderr)
         return 2
@@ -924,15 +1023,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 130
     finally:
         signal.signal(signal.SIGTERM, previous_handler)
-    print(
-        f"setup={record['setup']} stop_reason={record['stop_reason']} "
-        f"exit_code={record['exit_code']} elapsed_s={record['elapsed_s']} "
-        f"rx_bytes_peak={record['network']['rx_bytes_peak']} "
-        f"run_json={config.run_dir / 'run.json'}"
-    )
-    if record["stop_reason"] == "interrupted":
+    for run_dir, record in results:
+        print(
+            f"setup={record['setup']} stop_reason={record['stop_reason']} "
+            f"exit_code={record['exit_code']} elapsed_s={record['elapsed_s']} "
+            f"rx_bytes_peak={record['network']['rx_bytes_peak']} "
+            f"run_json={run_dir / 'run.json'}"
+        )
+    if any(record["stop_reason"] == "interrupted" for _, record in results):
         return 130
-    return 1 if record["error"] else 0
+    return 1 if any(record["error"] for _, record in results) else 0
 
 
 def _raise_interrupt(_signum: int, _frame: object) -> None:

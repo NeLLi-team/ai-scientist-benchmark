@@ -45,6 +45,17 @@ Defaults: prompt `<case>/exports/participant/participant_prompt.md`, starting da
 
 The run directory must be empty and on a POSIX filesystem (chmod 0600 and symlinks work). The exFAT disk under `/media/shared-expansion` fails that check; the runner says so and stops. A directory that still holds a credential copy (for example after a SIGKILL of the runner) is refused with its own message; delete it first.
 
+## Repeat a run
+
+`--repeat N` (default 1) runs the same setup N times, one after the other. With N above 1, `--run-dir` is a parent: run `i` goes to `<run-dir>/rNN` (`r01` ... `r10` ...) and is a normal run with its own `run.json`, credential cleanup and exposure scan. `<run-dir>/repeats.json` then lists the runs:
+
+```json
+{"schema_version": 1, "setup": "codex", "requested": 3,
+ "runs": [{"run": "r01", "run_json": "r01/run.json", "stop_reason": "agent_exit", "exit_code": 0, "elapsed_s": 5400.2}]}
+```
+
+The parent must be new or empty. The series stops at the first interrupted run, the first run that ends with `stop_reason: runner_error` or any `error` in its record (returned or raised), still writes `repeats.json` (a failed run without a `run.json` is listed with `stop_reason: runner_error` and `run_json: null`) and then exits like a single run would: 130 after an interrupt, 2 or the raised error otherwise. A run that ends on a limit (`wall_time`, `download_cap`, `monitor_failure`) does not stop the series. N = 1 behaves as before: one run in `--run-dir`, no `repeats.json`. The runner prints one summary line per run. Score the runs as one setup by passing the `rNN/work/deliverable` outputs to the scorer under names like `<setup>__r01`.
+
 Start the two runs in parallel from separate shells or `nohup`. Ctrl-C or SIGTERM, at any point in the watchdog loop, stops the container and still writes `run.json` with `stop_reason: interrupted` (exit code 130). Once the run directory exists, `run.json` is always written, with the error recorded when the run failed (`stop_reason: runner_error`); the runner then exits with the error.
 
 ## Run directory
@@ -98,7 +109,7 @@ The terms file is private: one term per line, `#` comments allowed (original IDs
 uv run python -m unittest discover -s tests
 ```
 
-`tests/test_benchmark_run.py` runs a stub agent (`tests/fixtures/stub_agent.py`, mounted over the real CLI path with `--agent-override`) inside the real image. It checks mounts, read-only enforcement, the overlay, hidden host paths, credential modes and absence from logs, the wall-time stop, the download-cap stop, the monitor-failure stop, interrupts, the runner-death backstop, hostile cleanup cases (symlinked credential directory, renamed and copied credentials, mode 000, printed and refreshed credentials, session logs), and the metadata. `tests/test_run_credentials.py` covers cleanup and the exposure scan, and `tests/test_container_reaper.py` the reaper, without Docker. The frozen-timeout test freezes `timeout` inside a stub and kills the runner. The Docker tests skip when the image is missing. No test calls a model.
+`tests/test_benchmark_run.py` runs a stub agent (`tests/fixtures/stub_agent.py`, mounted over the real CLI path with `--agent-override`) inside the real image. It checks mounts, read-only enforcement, the overlay, hidden host paths, credential modes and absence from logs, the wall-time stop, the download-cap stop, the monitor-failure stop, interrupts, the runner-death backstop, hostile cleanup cases (symlinked credential directory, renamed and copied credentials, mode 000, printed and refreshed credentials, session logs), the metadata, and a two-run `--repeat` series. The repeat series logic (numbering, `repeats.json`, stop on interrupt or failure) is also tested without Docker, with the single-run function replaced. `tests/test_run_credentials.py` covers cleanup and the exposure scan, and `tests/test_container_reaper.py` the reaper, without Docker. The frozen-timeout test freezes `timeout` inside a stub and kills the runner. The Docker tests skip when the image is missing. No test calls a model.
 
 ## Known limits
 

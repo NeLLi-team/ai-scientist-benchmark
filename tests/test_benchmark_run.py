@@ -1853,5 +1853,273 @@ def wait_for_container(prefix: str, timeout_s: float = 90) -> str:
     raise AssertionError(f"no container named {prefix}* appeared")
 
 
+class RepeatArgumentTest(unittest.TestCase):
+    ARGV = ("--setup", "codex", "--case-dir", "c", "--run-dir", "r")
+    ARGV_REST = ("--gv-exports-filtered", "f")
+
+    def parse(self, *extra: str):
+        return run_participant.parse_args([*self.ARGV, *self.ARGV_REST, *extra])
+
+    def test_repeat_defaults_to_one(self) -> None:
+        self.assertEqual(self.parse().repeat, 1)
+
+    def test_repeat_takes_a_count(self) -> None:
+        self.assertEqual(self.parse("--repeat", "3").repeat, 3)
+
+    def test_repeat_below_one_is_rejected(self) -> None:
+        for bad in ("0", "-2", "x"):
+            with (
+                self.subTest(value=bad),
+                self.assertRaises(SystemExit),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                self.parse("--repeat", bad)
+
+
+def fake_record(stop_reason: str = "agent_exit", exit_code: int = 0) -> dict:
+    """The few run.json fields the repeat series reads."""
+    return {
+        "setup": "codex",
+        "stop_reason": stop_reason,
+        "exit_code": exit_code,
+        "elapsed_s": 1.5,
+        "error": None,
+        "network": {"rx_bytes_peak": 0},
+    }
+
+
+class RepeatSeriesTest(unittest.TestCase):
+    """run_series with run_participant.run_participant replaced; no Docker."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.parent = Path(self._tmp.name) / "series"
+        self.config = make_config(self.parent)
+        self.case = run_participant.CaseFiles(prompt=Path("p"), input_dir=Path("i"))
+        self.seen: list[Path] = []
+
+    def run_series(self, repeat: int, records: list) -> list:
+        """Run the series; `records` holds one record or exception per run."""
+        queue = list(records)
+
+        def fake_run(config, _case, _credentials):
+            self.seen.append(config.run_dir)
+            outcome = queue.pop(0)
+            if isinstance(outcome, BaseException):
+                raise outcome
+            return outcome
+
+        with mock.patch.object(run_participant, "run_participant", fake_run):
+            return run_participant.run_series(
+                self.config, self.case, Path("c"), repeat=repeat
+            )
+
+    def repeats(self) -> dict:
+        path = self.parent / "repeats.json"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_one_run_uses_the_run_dir_itself_and_writes_no_repeats_file(self) -> None:
+        results = self.run_series(1, [fake_record()])
+
+        self.assertEqual(self.seen, [self.parent])
+        self.assertEqual([result.run_dir for result in results], [self.parent])
+        self.assertFalse((self.parent / "repeats.json").exists())
+
+    def test_repeats_run_in_order_in_numbered_subdirectories(self) -> None:
+        results = self.run_series(3, [fake_record() for _ in range(3)])
+
+        expected = [self.parent / name for name in ("r01", "r02", "r03")]
+        self.assertEqual(self.seen, expected)
+        self.assertEqual([result.run_dir for result in results], expected)
+
+    def test_repeats_file_lists_each_run_with_its_stop_reason(self) -> None:
+        self.run_series(
+            2, [fake_record("agent_exit"), fake_record("wall_time", exit_code=124)]
+        )
+
+        listing = self.repeats()
+        self.assertEqual(listing["setup"], "codex")
+        self.assertEqual(listing["requested"], 2)
+        self.assertEqual(
+            [(run["run"], run["stop_reason"]) for run in listing["runs"]],
+            [("r01", "agent_exit"), ("r02", "wall_time")],
+        )
+        self.assertEqual(listing["runs"][1]["run_json"], "r02/run.json")
+        self.assertEqual(listing["runs"][1]["exit_code"], 124)
+
+    def test_an_interrupted_run_ends_the_series_and_is_listed(self) -> None:
+        results = self.run_series(
+            3, [fake_record(), fake_record("interrupted", exit_code=137)]
+        )
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(self.seen, [self.parent / "r01", self.parent / "r02"])
+        self.assertEqual(
+            [run["stop_reason"] for run in self.repeats()["runs"]],
+            ["agent_exit", "interrupted"],
+        )
+
+    def test_a_failed_run_is_listed_with_its_run_json_and_raised_again(self) -> None:
+        records = [fake_record()]
+
+        def fake_run(config, _case, _credentials):
+            self.seen.append(config.run_dir)
+            if records:
+                return records.pop()
+            config.run_dir.mkdir(parents=True)
+            failed = fake_record("runner_error", exit_code=None)
+            (config.run_dir / "run.json").write_text(
+                json.dumps(failed), encoding="utf-8"
+            )
+            raise RuntimeError("boom")
+
+        with (
+            mock.patch.object(run_participant, "run_participant", fake_run),
+            self.assertRaises(RuntimeError),
+        ):
+            run_participant.run_series(self.config, self.case, Path("c"), repeat=3)
+
+        self.assertEqual(self.seen, [self.parent / "r01", self.parent / "r02"])
+        self.assertEqual(
+            [run["stop_reason"] for run in self.repeats()["runs"]],
+            ["agent_exit", "runner_error"],
+        )
+
+    def test_a_returned_runner_error_record_ends_the_series_and_is_listed(
+        self,
+    ) -> None:
+        failed = fake_record("runner_error", exit_code=None)
+        failed["error"] = "RunnerError: docker not reachable"
+
+        results = self.run_series(3, [fake_record(), failed])
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(self.seen, [self.parent / "r01", self.parent / "r02"])
+        self.assertEqual(
+            [run["stop_reason"] for run in self.repeats()["runs"]],
+            ["agent_exit", "runner_error"],
+        )
+
+    def test_any_returned_record_with_an_error_ends_the_series(self) -> None:
+        failed = fake_record("agent_exit")
+        failed["error"] = "ValueError: could not read the transcript"
+
+        results = self.run_series(3, [failed])
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(self.seen, [self.parent / "r01"])
+        self.assertEqual(len(self.repeats()["runs"]), 1)
+
+    def test_a_failure_before_any_run_json_exists_is_listed_as_runner_error(
+        self,
+    ) -> None:
+        with self.assertRaises(run_participant.RunnerError):
+            self.run_series(2, [run_participant.RunnerError("no prompt")])
+
+        self.assertEqual(
+            [run["stop_reason"] for run in self.repeats()["runs"]], ["runner_error"]
+        )
+
+    def test_a_non_empty_run_dir_is_refused_before_any_run(self) -> None:
+        self.parent.mkdir()
+        (self.parent / "old.txt").write_text("x", encoding="utf-8")
+
+        with self.assertRaises(run_participant.RunnerError) as raised:
+            self.run_series(2, [fake_record(), fake_record()])
+
+        self.assertIn("not empty", str(raised.exception))
+        self.assertEqual(self.seen, [])
+
+
+class RepeatMainTest(unittest.TestCase):
+    def test_main_prints_one_summary_line_per_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = io.StringIO()
+
+            def fake_run(config, _case, _credentials):
+                return fake_record()
+
+            with (
+                mock.patch.object(run_participant, "run_participant", fake_run),
+                contextlib.redirect_stdout(out),
+            ):
+                code = run_participant.main(
+                    [
+                        "--setup", "codex",
+                        "--case-dir", tmp,
+                        "--run-dir", str(Path(tmp) / "series"),
+                        "--gv-exports-filtered", tmp,
+                        "--repeat", "2",
+                    ]
+                )  # fmt: skip
+
+        lines = out.getvalue().strip().splitlines()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(lines), 2)
+        self.assertIn("r01/run.json", lines[0])
+        self.assertIn("r02/run.json", lines[1])
+
+    def test_main_returns_130_when_a_repeat_was_interrupted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            records = iter([fake_record("interrupted", exit_code=137)])
+
+            def fake_run(config, _case, _credentials):
+                return next(records)
+
+            with (
+                mock.patch.object(run_participant, "run_participant", fake_run),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                code = run_participant.main(
+                    [
+                        "--setup", "codex",
+                        "--case-dir", tmp,
+                        "--run-dir", str(Path(tmp) / "series"),
+                        "--gv-exports-filtered", tmp,
+                        "--repeat", "2",
+                    ]
+                )  # fmt: skip
+
+        self.assertEqual(code, 130)
+
+
+@unittest.skipUnless(image_available(), f"image {IMAGE} not available")
+class ContainerRepeatTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._tmp = tempfile.TemporaryDirectory()
+        world = World(Path(cls._tmp.name))
+        world.write_prompt("mode=probe")
+        cls.code, cls.run_dir, _ = world.run("codex", "series", "--repeat", "2")
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._tmp.cleanup()
+
+    def test_runner_exits_zero(self) -> None:
+        self.assertEqual(self.code, 0)
+
+    def test_each_repeat_is_a_normal_run_with_its_own_record_and_deliverable(
+        self,
+    ) -> None:
+        for name in ("r01", "r02"):
+            with self.subTest(run=name):
+                meta = json.loads(
+                    (self.run_dir / name / "run.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(meta["stop_reason"], "agent_exit")
+                self.assertTrue((self.run_dir / name / "work" / "deliverable").is_dir())
+
+    def test_repeats_file_lists_both_runs(self) -> None:
+        listing = json.loads(
+            (self.run_dir / "repeats.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            [(run["run"], run["stop_reason"]) for run in listing["runs"]],
+            [("r01", "agent_exit"), ("r02", "agent_exit")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

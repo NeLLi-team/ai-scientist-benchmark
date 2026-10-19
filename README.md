@@ -264,7 +264,7 @@ uv run python skills/benchmark-run/scripts/run_participant.py \
   --gv-exports-filtered <case-specific-filtered-gv-exports>
 ```
 
-Use `--setup claude` for Claude Code. The run directory ends up with `transcript.jsonl`, `stderr.log`, `work/deliverable/manuscript.md`, and `run.json` (versions, models, image id, limits, stop reason, network bytes, token usage, deliverable hashes). Credentials are copied into the run's private HOME with mode 0600 and deleted when the run ends.
+Use `--setup claude` for Claude Code. Add `--repeat N` to run the same setup N times in a row: the runs go into `<run-dir>/r01` ... `rNN`, each a normal run with its own `run.json`, and `<run-dir>/repeats.json` lists them with their stop reasons. The run directory ends up with `transcript.jsonl`, `stderr.log`, `work/deliverable/manuscript.md`, and `run.json` (versions, models, image id, limits, stop reason, network bytes, token usage, deliverable hashes). Credentials are copied into the run's private HOME with mode 0600 and deleted when the run ends.
 
 After a run, scan it for terms that must not appear (original IDs, paper-only names, the paper title):
 
