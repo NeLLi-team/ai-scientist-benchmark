@@ -4,8 +4,9 @@
 Judge models label every ground-truth assertion as matched, partial, missing or
 contradicted for each candidate. The scorer checks the labels, weights them by
 criticality and reports per-judge and mean scores, judge agreement, repeat
-statistics and anchor checks. It refuses to run unless a reviewer has signed the
-ground truth (see `review_ground_truth.py`), or the caller allows a provisional run.
+statistics and anchor checks. A reviewer signs the ground truth with
+`review_ground_truth.py`. Without a valid sign-off the scorer still runs, warns and
+marks every result provisional; `--require-signoff` makes it refuse instead.
 """
 
 from __future__ import annotations
@@ -100,16 +101,17 @@ class Panel:
     cached_only: bool
 
 
-def load_ground_truth(case_dir: Path, *, allow_unsigned: bool) -> GroundTruth:
+def load_ground_truth(case_dir: Path, *, require_signoff: bool) -> GroundTruth:
     """Read the ground-truth CSAG and apply the reviewer's sign-off.
 
     The file is read once, so the hash covers exactly the bytes that are scored.
-    With `allow_unsigned`, a sign-off that is missing, stale, incomplete or
-    invalid is set aside and the result is provisional, with the reason kept.
+    A sign-off that is missing, stale, incomplete or invalid is set aside with a
+    warning and the result is provisional, with the reason kept. A valid one
+    applies its criticality edits and drops rejected assertions.
 
     Raises:
         ScoringError: The ground truth is unreadable, the sign-off is unusable
-            and `allow_unsigned` is false, or an assertion has no usable
+            and `require_signoff` is true, or an assertion has no usable
             criticality.
     """
     truth_path = case_dir / "csag" / "paper_extraction.json"
@@ -128,10 +130,8 @@ def load_ground_truth(case_dir: Path, *, allow_unsigned: bool) -> GroundTruth:
             current_criticality=current,
         )
     except SignoffError as err:
-        if not allow_unsigned:
-            raise ScoringError(
-                f"{err}; sign the ground truth or pass --allow-unsigned"
-            ) from err
+        if require_signoff:
+            raise ScoringError(f"{err}; sign the ground truth first") from err
         logger.warning("%s; continuing, results are provisional", err)
         decisions, problem = None, str(err)
     else:
@@ -161,7 +161,7 @@ def run(args: argparse.Namespace) -> None:
     """Gate, judge every candidate and anchor, then write the results."""
     case_dir = args.case_dir.resolve()
     judges = _select_judges(args.judges)
-    truth = load_ground_truth(case_dir, allow_unsigned=args.allow_unsigned)
+    truth = load_ground_truth(case_dir, require_signoff=args.require_signoff)
     schema = _keyword_schema(case_dir)
     candidates = _load_candidates(args.candidate_dir, schema)
     anchors = []
@@ -201,9 +201,10 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--judges", default=DEFAULT_JUDGES, help="Comma list: sonnet,astra."
     )
     parser.add_argument(
-        "--allow-unsigned",
+        "--require-signoff",
         action="store_true",
-        help="Run without a valid sign-off; every result is marked provisional.",
+        help="Refuse to run (exit 2) without a valid sign-off. By default the "
+        "scorer warns and marks every result provisional.",
     )
     parser.add_argument("--anchors", choices=("default", "none"), default="default")
     parser.add_argument(

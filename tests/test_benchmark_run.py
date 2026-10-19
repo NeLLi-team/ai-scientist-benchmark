@@ -938,6 +938,8 @@ class PreflightTest(unittest.TestCase):
                     str(run_dir),
                     "--gv-exports-filtered",
                     tmp,
+                    "--repeat",
+                    "1",
                 ]
             )
 
@@ -1093,6 +1095,7 @@ class World:
             "--gv-exports-filtered", str(self.filtered),
             "--credentials", str(credentials[setup]),
             "--agent-override", str(STUB_AGENT),
+            "--repeat", "1",
             *extra,
         ]  # fmt: skip
 
@@ -1860,8 +1863,8 @@ class RepeatArgumentTest(unittest.TestCase):
     def parse(self, *extra: str):
         return run_participant.parse_args([*self.ARGV, *self.ARGV_REST, *extra])
 
-    def test_repeat_defaults_to_one(self) -> None:
-        self.assertEqual(self.parse().repeat, 1)
+    def test_repeat_defaults_to_three(self) -> None:
+        self.assertEqual(self.parse().repeat, 3)
 
     def test_repeat_takes_a_count(self) -> None:
         self.assertEqual(self.parse("--repeat", "3").repeat, 3)
@@ -2033,6 +2036,36 @@ class RepeatSeriesTest(unittest.TestCase):
 
 
 class RepeatMainTest(unittest.TestCase):
+    def test_main_runs_three_times_by_default_into_r01_to_r03(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = io.StringIO()
+            run_dirs = []
+
+            def fake_run(config, _case, _credentials):
+                run_dirs.append(config.run_dir.name)
+                return fake_record()
+
+            with (
+                mock.patch.object(run_participant, "run_participant", fake_run),
+                contextlib.redirect_stdout(out),
+            ):
+                code = run_participant.main(
+                    [
+                        "--setup", "codex",
+                        "--case-dir", tmp,
+                        "--run-dir", str(Path(tmp) / "series"),
+                        "--gv-exports-filtered", tmp,
+                    ]
+                )  # fmt: skip
+            listing = json.loads(
+                (Path(tmp) / "series" / "repeats.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(run_dirs, ["r01", "r02", "r03"])
+        self.assertEqual(listing["requested"], 3)
+        self.assertEqual([run["run"] for run in listing["runs"]], ["r01", "r02", "r03"])
+
     def test_main_prints_one_summary_line_per_run(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out = io.StringIO()

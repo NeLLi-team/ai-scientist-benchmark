@@ -51,6 +51,7 @@ CONTAINER_ENV = (
     "DISABLE_AUTOUPDATER=1",
 )
 SCHEMA_VERSION = 1
+DEFAULT_REPEAT = 3
 CONTAINER_KILL_AFTER_S = 30
 
 CODEX_CONFIG = """\
@@ -883,9 +884,10 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--repeat",
         type=_positive_int,
-        default=1,
+        default=DEFAULT_REPEAT,
         help="Run N times in a row into <run-dir>/r01 ... rNN and write "
-        "<run-dir>/repeats.json (default 1: one run in <run-dir>).",
+        f"<run-dir>/repeats.json (default {DEFAULT_REPEAT}; 1 runs once in "
+        "<run-dir> itself).",
     )
     _add_limit_args(parser)
     return parser.parse_args(argv)

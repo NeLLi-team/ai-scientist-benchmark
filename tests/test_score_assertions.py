@@ -516,29 +516,29 @@ class SignoffGateTest(ScorerRunTestCase):
         super().setUp()
         self.add_candidate("solo", [TEXTS["A0002"]], marker="m")
 
-    def test_run_refuses_without_signoff(self) -> None:
-        code, output = self.run_scorer("--anchors", "none")
+    def test_require_signoff_refuses_without_signoff(self) -> None:
+        code, output = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 2)
         self.assertIn("signoff.json", output)
         self.assertEqual(self.calls(), [])
 
-    def test_run_refuses_a_signoff_for_another_ground_truth(self) -> None:
+    def test_require_signoff_refuses_a_signoff_for_another_ground_truth(self) -> None:
         self.sign(sha="0" * 64)
 
-        code, output = self.run_scorer("--anchors", "none")
+        code, output = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 2)
         self.assertIn("sha256", output)
         self.assertEqual(self.calls(), [])
 
-    def test_run_refuses_a_signoff_that_skips_an_assertion(self) -> None:
+    def test_require_signoff_refuses_a_signoff_that_skips_an_assertion(self) -> None:
         self.sign()
         sheet = json.loads((self.case / "csag" / "signoff.json").read_text("utf-8"))
         del sheet["assertions"]["A0003"]
         write_json(self.case / "csag" / "signoff.json", sheet)
 
-        code, output = self.run_scorer("--anchors", "none")
+        code, output = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 2)
         self.assertIn("A0003", output)
@@ -554,92 +554,102 @@ class SignoffGateTest(ScorerRunTestCase):
     def assert_refused(self, change, expected: str) -> None:
         self.edit_signoff(change)
 
-        code, output = self.run_scorer("--anchors", "none")
+        code, output = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 2)
         self.assertIn(expected, output)
         self.assertEqual(self.calls(), [])
 
-    def test_run_refuses_a_signoff_without_a_reviewer(self) -> None:
+    def test_require_signoff_refuses_a_signoff_without_a_reviewer(self) -> None:
         self.assert_refused(lambda sheet: sheet.pop("reviewer"), "reviewer")
 
-    def test_run_refuses_a_signoff_with_a_blank_reviewer(self) -> None:
+    def test_require_signoff_refuses_a_signoff_with_a_blank_reviewer(self) -> None:
         self.assert_refused(lambda sheet: sheet.update(reviewer=" "), "reviewer")
 
-    def test_run_refuses_a_signoff_without_a_signing_time(self) -> None:
+    def test_require_signoff_refuses_a_signoff_without_a_signing_time(self) -> None:
         self.assert_refused(lambda sheet: sheet.pop("signed_at"), "signed_at")
 
-    def test_run_refuses_a_signoff_with_an_unreadable_signing_time(self) -> None:
+    def test_require_signoff_refuses_a_signoff_with_an_unreadable_signing_time(
+        self,
+    ) -> None:
         self.assert_refused(lambda sheet: sheet.update(signed_at="soon"), "signed_at")
 
-    def test_run_refuses_a_signoff_made_for_another_case(self) -> None:
+    def test_require_signoff_refuses_a_signoff_made_for_another_case(self) -> None:
         self.assert_refused(lambda sheet: sheet.update(case_id="other"), "case_id")
 
-    def test_run_refuses_an_approve_that_changes_the_criticality(self) -> None:
+    def test_require_signoff_refuses_an_approve_that_changes_the_criticality(
+        self,
+    ) -> None:
         def change(sheet) -> None:
             sheet["assertions"]["A0001"]["criticality"] = "background"
 
         self.assert_refused(change, "approve")
 
-    def test_run_refuses_an_unknown_decision(self) -> None:
+    def test_require_signoff_refuses_an_unknown_decision(self) -> None:
         def change(sheet) -> None:
             sheet["assertions"]["A0001"]["decision"] = "maybe"
 
         self.assert_refused(change, "maybe")
 
-    def test_run_refuses_an_unknown_criticality(self) -> None:
+    def test_require_signoff_refuses_an_unknown_criticality(self) -> None:
         def change(sheet) -> None:
             sheet["assertions"]["A0002"] = {"decision": "edit", "criticality": "huge"}
 
         self.assert_refused(change, "huge")
 
-    def test_run_refuses_a_decision_for_an_assertion_the_truth_lacks(self) -> None:
+    def test_require_signoff_refuses_a_decision_for_an_assertion_the_truth_lacks(
+        self,
+    ) -> None:
         def change(sheet) -> None:
             sheet["assertions"]["A9999"] = sheet["assertions"]["A0001"]
 
         self.assert_refused(change, "A9999")
 
-    def test_run_refuses_a_signoff_that_is_not_json(self) -> None:
+    def test_require_signoff_refuses_a_signoff_that_is_not_json(self) -> None:
         (self.case / "csag").mkdir(parents=True, exist_ok=True)
         (self.case / "csag" / "signoff.json").write_text("not json", "utf-8")
 
-        code, output = self.run_scorer("--anchors", "none")
+        code, output = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 2)
         self.assertIn("signoff.json", output)
 
-    def test_allow_unsigned_covers_an_incomplete_signoff(self) -> None:
+    def test_an_incomplete_signoff_scores_provisionally_by_default(self) -> None:
         def change(sheet) -> None:
             del sheet["assertions"]["A0003"]
             sheet["assertions"]["A0004"]["decision"] = "reject"
 
         self.edit_signoff(change)
 
-        code, _ = self.run_scorer("--anchors", "none", "--allow-unsigned")
+        code, output = self.run_scorer("--anchors", "none")
 
         results = self.results()
         self.assertEqual(code, 0)
         self.assertTrue(results["provisional"])
         self.assertFalse(results["signed"])
         self.assertIn("A0003", results["signoff_problem"])
+        self.assertIn("A0003", output)
         self.assertIn("A0004", self.candidate_result("solo")["verdicts"]["sonnet"])
 
-    def test_allow_unsigned_covers_a_signoff_that_fails_validation(self) -> None:
+    def test_a_signoff_that_fails_validation_scores_provisionally_by_default(
+        self,
+    ) -> None:
         def change(sheet) -> None:
             sheet["assertions"]["A0001"]["criticality"] = "background"
 
         self.edit_signoff(change)
 
-        code, _ = self.run_scorer("--anchors", "none", "--allow-unsigned")
+        code, _ = self.run_scorer("--anchors", "none")
 
         self.assertEqual(code, 0)
         self.assertTrue(self.results()["provisional"])
         self.assertIn("approve", self.results()["signoff_problem"])
 
-    def test_allow_unsigned_covers_a_signoff_that_is_not_json(self) -> None:
+    def test_a_signoff_that_is_not_json_scores_provisionally_by_default(self) -> None:
+        (self.case / "csag").mkdir(parents=True, exist_ok=True)
         (self.case / "csag" / "signoff.json").write_text("not json", "utf-8")
 
-        code, _ = self.run_scorer("--anchors", "none", "--allow-unsigned")
+        code, _ = self.run_scorer("--anchors", "none")
 
         self.assertEqual(code, 0)
         self.assertIn("signoff.json", self.results()["signoff_problem"])
@@ -664,30 +674,49 @@ class SignoffGateTest(ScorerRunTestCase):
         sheet.write_text(edited, encoding="utf-8")
         review_ground_truth.sign_off(self.case, sheet, reviewer="TESTER")
 
-        code, _ = self.run_scorer("--anchors", "none")
+        code, _ = self.run_scorer("--anchors", "none", "--require-signoff")
 
         self.assertEqual(code, 0)
         self.assertTrue(self.results()["signed"])
         self.assertEqual(self.candidate_result("solo")["score"], 36.36)
 
-    def test_allow_unsigned_runs_and_marks_everything_provisional(self) -> None:
-        code, _ = self.run_scorer("--anchors", "none", "--allow-unsigned")
+    def test_a_missing_signoff_scores_provisionally_with_a_warning(self) -> None:
+        code, output = self.run_scorer("--anchors", "none")
 
         results = self.results()
         self.assertEqual(code, 0)
+        self.assertIn("no signoff.json", output)
+        self.assertIn("provisional", output)
         self.assertFalse(results["signed"])
         self.assertTrue(results["provisional"])
         self.assertTrue(self.candidate_result("solo")["provisional"])
         self.assertTrue(results["setups"][0]["provisional"])
         self.assertIn("no signoff.json", results["signoff_problem"])
 
-    def test_allow_unsigned_ignores_a_stale_signoff(self) -> None:
+    def test_a_stale_signoff_is_ignored_and_the_run_is_provisional(self) -> None:
         self.sign({"A0004": {"decision": "reject"}}, sha="0" * 64)
 
-        code, _ = self.run_scorer("--anchors", "none", "--allow-unsigned")
+        code, _ = self.run_scorer("--anchors", "none")
 
         self.assertEqual(code, 0)
+        self.assertTrue(self.results()["provisional"])
         self.assertIn("A0004", self.candidate_result("solo")["verdicts"]["sonnet"])
+
+    def test_require_signoff_runs_with_a_valid_signoff(self) -> None:
+        self.sign({"A0004": {"decision": "reject"}})
+
+        code, _ = self.run_scorer("--anchors", "none", "--require-signoff")
+
+        self.assertEqual(code, 0)
+        self.assertTrue(self.results()["signed"])
+        self.assertFalse(self.results()["provisional"])
+        self.assertNotIn("A0004", self.candidate_result("solo")["verdicts"]["sonnet"])
+
+    def test_the_allow_unsigned_flag_is_gone(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            self.run_scorer("--anchors", "none", "--allow-unsigned")
+
+        self.assertEqual(raised.exception.code, 2)
 
     def test_signed_run_applies_edits_and_drops_rejected_assertions(self) -> None:
         self.sign(
@@ -722,7 +751,7 @@ class GroundTruthReadTest(ScorerRunTestCase):
             return data
 
         with mock.patch.object(Path, "read_bytes", read_then_swap):
-            truth = score_assertions.load_ground_truth(self.case, allow_unsigned=False)
+            truth = score_assertions.load_ground_truth(self.case, require_signoff=True)
 
         self.assertEqual(truth.references[0].text, TEXTS["A0001"])
         self.assertTrue(truth.signed)
@@ -966,7 +995,7 @@ class ScorerEndToEndTest(ScorerRunTestCase):
     def test_run_marks_the_markdown_report_provisional_when_unsigned(self) -> None:
         (self.case / "csag" / "signoff.json").unlink()
 
-        self.run_scorer("--anchors", "none", "--allow-unsigned")
+        self.run_scorer("--anchors", "none")
 
         report = (self.out / "results.md").read_text(encoding="utf-8")
         self.assertIn("PROVISIONAL", report)

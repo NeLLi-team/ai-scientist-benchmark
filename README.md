@@ -169,7 +169,7 @@ uv run python skills/benchmark-scoring/scripts/review_ground_truth.py sign \
 
 ### Assertion-level scoring
 
-`score_assertions.py` scores candidate CSAGs against the signed ground truth: two judge models (`claude` and `codex` through their own logins) give each ground-truth assertion a verdict, and the scorer weights the verdicts by criticality. It refuses to run without a `signoff.json` that is valid for the current `paper_extraction.json` unless you pass `--allow-unsigned`, which marks every result provisional and records why. It also scores three anchors (the ground truth itself, an unrelated paper, a negated copy) and reports `"valid": false` when one is out of range.
+`score_assertions.py` scores candidate CSAGs against the signed ground truth: two judge models (`claude` and `codex` through their own logins) give each ground-truth assertion a verdict, and the scorer weights the verdicts by criticality. Without a `signoff.json` that is valid for the current `paper_extraction.json` it still runs, logs a warning, records why in `signoff_problem` and marks every result provisional; `--require-signoff` makes it refuse instead (exit 2). It also scores three anchors (the ground truth itself, an unrelated paper, a negated copy) and reports `"valid": false` when one is out of range.
 
 ```bash
 uv run python skills/benchmark-scoring/scripts/score_assertions.py \
@@ -276,7 +276,7 @@ This repo is therefore for **authoring ground truth, participant prompts, and sc
 
 The `benchmark-run` skill runs one native participant, Codex CLI or Claude Code, against a case that already has its participant export. Each run happens in a pinned Docker container that sees only the starting data (read-only), a work directory, a private HOME and the read-only reference databases. A watchdog stops the container at 3 hours or at 10 GB received.
 
-Build the image once, then start one run per setup:
+Build the image once, then start one series of runs per setup:
 
 ```bash
 skills/benchmark-run/docker/build.sh
@@ -288,7 +288,7 @@ uv run python skills/benchmark-run/scripts/run_participant.py \
   --gv-exports-filtered <case-specific-filtered-gv-exports>
 ```
 
-Use `--setup claude` for Claude Code. Add `--repeat N` to run the same setup N times in a row: the runs go into `<run-dir>/r01` ... `rNN`, each a normal run with its own `run.json`, and `<run-dir>/repeats.json` lists them with their stop reasons. The run directory ends up with `transcript.jsonl`, `stderr.log`, `work/deliverable/manuscript.md`, and `run.json` (versions, models, image id, limits, stop reason, network bytes, token usage, deliverable hashes). Credentials are copied into the run's private HOME with mode 0600 and deleted when the run ends.
+Use `--setup claude` for Claude Code. By default the runner runs the same setup 3 times in a row (`--repeat 3`): the runs go into `<run-dir>/r01` ... `r03`, each a normal run with its own `run.json`, and `<run-dir>/repeats.json` lists them with their stop reasons. Pass `--repeat 1` for a single run in `<run-dir>` itself. Each run directory ends up with `transcript.jsonl`, `stderr.log`, `work/deliverable/manuscript.md`, and `run.json` (versions, models, image id, limits, stop reason, network bytes, token usage, deliverable hashes). Credentials are copied into the run's private HOME with mode 0600 and deleted when the run ends.
 
 After a run, scan it for terms that must not appear (original IDs, paper-only names, the paper title):
 

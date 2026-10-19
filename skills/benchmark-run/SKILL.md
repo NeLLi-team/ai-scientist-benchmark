@@ -32,7 +32,7 @@ docker image inspect benchmark-participant:2026-10-19 --format '{{.Id}}'
 
 The build fails if a binary does not match its pinned SHA-256 or version. To change a pin, edit the constants in `docker/build.sh` and the default tag in `scripts/run_participant.py`.
 
-## Run one participant
+## Run a participant
 
 ```bash
 uv run python skills/benchmark-run/scripts/run_participant.py \
@@ -41,22 +41,24 @@ uv run python skills/benchmark-run/scripts/run_participant.py \
   --run-dir <new-or-empty-dir-on-a-posix-filesystem>
 ```
 
+This runs the setup 3 times (see "Repeat a run"); add `--repeat 1` for one run in `--run-dir` itself.
+
 Defaults: prompt `<case>/exports/participant/participant_prompt.md`, starting data `<case>/exports/participant/files` (the layout `blind_case.py` writes), credentials `~/.codex/auth.json` or `~/.claude/.credentials.json`, database `/media/shared-expansion/db`. `--gv-exports-filtered` is required: pass the case-specific filtered copy built with `filter_reference_db.py`. Override the defaults with `--prompt-file`, `--input-dir`, `--credentials`, `--db-dir`, `--gv-exports-filtered`. Limits have flags too (`--wall-limit-s`, `--rx-limit-bytes`, `--poll-interval-s`, `--max-failed-reads`, `--startup-grace-s`, `--container-timeout-margin-s`, `--reaper-margin-s`, `--cpus`, `--memory`, `--pids-limit`, `--shm-size`).
 
 The run directory must be empty and on a POSIX filesystem (chmod 0600 and symlinks work). The exFAT disk under `/media/shared-expansion` fails that check; the runner says so and stops. A directory that still holds a credential copy (for example after a SIGKILL of the runner) is refused with its own message; delete it first.
 
 ## Repeat a run
 
-`--repeat N` (default 1) runs the same setup N times, one after the other. With N above 1, `--run-dir` is a parent: run `i` goes to `<run-dir>/rNN` (`r01` ... `r10` ...) and is a normal run with its own `run.json`, credential cleanup and exposure scan. `<run-dir>/repeats.json` then lists the runs:
+`--repeat N` (default 3, the owner's choice of runs per setup) runs the same setup N times, one after the other. With N above 1, `--run-dir` is a parent: run `i` goes to `<run-dir>/rNN` (`r01` ... `r10` ...) and is a normal run with its own `run.json`, credential cleanup and exposure scan. `<run-dir>/repeats.json` then lists the runs:
 
 ```json
 {"schema_version": 1, "setup": "codex", "requested": 3,
  "runs": [{"run": "r01", "run_json": "r01/run.json", "stop_reason": "agent_exit", "exit_code": 0, "elapsed_s": 5400.2}]}
 ```
 
-The parent must be new or empty. The series stops at the first interrupted run, the first run that ends with `stop_reason: runner_error` or any `error` in its record (returned or raised), still writes `repeats.json` (a failed run without a `run.json` is listed with `stop_reason: runner_error` and `run_json: null`) and then exits like a single run would: 130 after an interrupt, 2 or the raised error otherwise. A run that ends on a limit (`wall_time`, `download_cap`, `monitor_failure`) does not stop the series. N = 1 behaves as before: one run in `--run-dir`, no `repeats.json`. The runner prints one summary line per run. Score the runs as one setup by passing the `rNN/work/deliverable` outputs to the scorer under names like `<setup>__r01`.
+The parent must be new or empty. The series stops at the first interrupted run, the first run that ends with `stop_reason: runner_error` or any `error` in its record (returned or raised), still writes `repeats.json` (a failed run without a `run.json` is listed with `stop_reason: runner_error` and `run_json: null`) and then exits like a single run would: 130 after an interrupt, 2 or the raised error otherwise. A run that ends on a limit (`wall_time`, `download_cap`, `monitor_failure`) does not stop the series. `--repeat 1` runs once in `--run-dir`, with no `repeats.json`. The runner prints one summary line per run. Score the runs as one setup by passing the `rNN/work/deliverable` outputs to the scorer under names like `<setup>__r01`.
 
-Start the two runs in parallel from separate shells or `nohup`. Ctrl-C or SIGTERM, at any point in the watchdog loop, stops the container and still writes `run.json` with `stop_reason: interrupted` (exit code 130). Once the run directory exists, `run.json` is always written, with the error recorded when the run failed (`stop_reason: runner_error`); the runner then exits with the error.
+To run the two setups in parallel, start them from separate shells or `nohup`, each with its own `--run-dir`. Ctrl-C or SIGTERM, at any point in the watchdog loop, stops the container and still writes `run.json` with `stop_reason: interrupted` (exit code 130). Once the run directory exists, `run.json` is always written, with the error recorded when the run failed (`stop_reason: runner_error`); the runner then exits with the error.
 
 ## Run directory
 
