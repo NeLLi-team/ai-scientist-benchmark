@@ -6,6 +6,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import shutil
 import sys
 import tempfile
 import unittest
@@ -31,7 +32,8 @@ SOURCE_EXTRACTION = {
             "label": "A0001",
             "assertion_text": "Bin IMGS01 encodes a capsid protein.",
             "falsification_criteria": ["No capsid hit in IMGS01.", "Hit is partial."],
-            "criticality": "high",
+            "criticality": "core",
+            "claim_role": "result_claim",
             "text_spans": [{"text": "The IMGS01 bin was reported."}],
         },
         {
@@ -39,7 +41,8 @@ SOURCE_EXTRACTION = {
             "label": "A0002",
             "assertion_text": "The second bin is smaller.",
             "falsification_criteria": ["Sizes are equal."],
-            "criticality": "low",
+            "criticality": "major",
+            "claim_role": "analysis_claim",
             "text_spans": [{"text": "Size is shown in Table 1."}],
         },
     ],
@@ -58,7 +61,23 @@ SOURCE_EXTRACTION = {
             "text_spans": [],
         },
     ],
-    "evidence_links": [{"id": "csag:link/L1", "assertion": "csag:assertion/A0001"}],
+    "evidence_links": [
+        {
+            "id": "csag:link/L1",
+            "assertion": "csag:assertion/A0001",
+            "evidence_item": "csag:evidence/E0004",
+            "polarity": "supports",
+            "strength": "strong",
+        },
+        {
+            "id": "csag:link/x/L2",
+            "label": "LinkTwo",
+            "assertion": "csag:assertion/A0002",
+            "evidence_item": "csag:evidence/E0005",
+            "polarity": "contradicts",
+            "strength": "weak",
+        },
+    ],
 }
 SCHEMA_TEXT = '{"scoring": "schema"}\n'
 REWRITES = {
@@ -244,7 +263,7 @@ class BlindGroundTruthTest(unittest.TestCase):
         self.assertIn("A9999", self.run_refused())
 
     def test_unknown_field_is_refused(self) -> None:
-        self.write_inputs({"assertions": {"A0001": {"criticality": "low"}}}, "zzz\n")
+        self.write_inputs({"assertions": {"A0001": {"criticality": "major"}}}, "zzz\n")
 
         self.assertIn("criticality", self.run_refused())
 
@@ -268,6 +287,128 @@ class BlindGroundTruthTest(unittest.TestCase):
 
         self.assertEqual(self.run_main(), 0)
         self.assertIn("Smith lab", json.dumps(self.output()))
+
+    def set_source(self, mutate) -> None:
+        extraction = copy.deepcopy(SOURCE_EXTRACTION)
+        mutate(extraction)
+        self.source_csag.write_text(json.dumps(extraction), encoding="utf-8")
+
+    def test_assertion_label_is_checked(self) -> None:
+        self.write_inputs({}, "A0002\n")
+
+        self.assertIn("A0002.label: A0002", self.run_refused())
+
+    def test_assertion_claim_role_is_checked(self) -> None:
+        self.write_inputs({}, "Analysis_Claim\n")
+
+        self.assertIn("A0002.claim_role: Analysis_Claim", self.run_refused())
+
+    def test_link_polarity_and_strength_are_checked(self) -> None:
+        self.write_inputs({}, "supports\nweak\n")
+
+        message = self.run_refused()
+
+        self.assertIn("L1.polarity: supports", message)
+        self.assertIn("LinkTwo.strength: weak", message)
+
+    def test_same_source_and_blind_case_is_refused(self) -> None:
+        shutil.copyfile(self.case_yaml, self.source / "case.yaml")
+        before = {p: p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.blind = self.root / "ground_truth" / ".." / "ground_truth" / "src"
+
+        with self.assertLogs(self.module.logger, level="ERROR") as logs:
+            code = self.run_main()
+
+        self.assertEqual(code, 2)
+        self.assertIn("same", "\n".join(logs.output))
+        after = {p: p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+
+    def test_failure_leaves_an_earlier_output_untouched(self) -> None:
+        self.run_main()
+        files = [
+            self.case_yaml,
+            self.blind / "csag" / "paper_extraction.json",
+            self.blind / "scoring" / "scoring_schema.json",
+        ]
+        before = [path.read_bytes() for path in files]
+        self.write_inputs(REWRITES, "assembly_A\n")
+
+        self.assertEqual(self.run_main(), 2)
+
+        self.assertEqual([path.read_bytes() for path in files], before)
+
+    def test_unusable_case_yaml_writes_nothing(self) -> None:
+        for text in ("- a list\n", "case: x\n", "key: [unclosed\n"):
+            with self.subTest(text=text):
+                self.case_yaml.write_text(text, encoding="utf-8")
+
+                self.run_refused()
+
+    def test_unparsable_inputs_are_refused(self) -> None:
+        for path in (self.source_csag, self.rewrites_path):
+            with self.subTest(path=path.name):
+                original = path.read_bytes()
+                path.write_text("{not json", encoding="utf-8")
+
+                self.run_refused()
+
+                path.write_bytes(original)
+
+    def test_duplicate_labels_are_refused(self) -> None:
+        def duplicate_assertion(extraction: dict) -> None:
+            extraction["assertions"][1]["label"] = "A0001"
+
+        self.set_source(duplicate_assertion)
+        self.write_inputs(REWRITES, "zzz\n")
+
+        self.assertIn("A0001", self.run_refused())
+
+    def test_fallback_label_that_collides_is_refused(self) -> None:
+        def collide(extraction: dict) -> None:
+            extraction["evidence_items"][1]["id"] = "csag:evidence/E0004"
+
+        self.set_source(collide)
+        self.write_inputs(REWRITES, "zzz\n")
+
+        self.assertIn("E0004", self.run_refused())
+
+    def test_bad_value_types_are_refused_with_label_and_field(self) -> None:
+        cases = {
+            "A0001.assertion_text": {"A0001": {"assertion_text": ""}},
+            "A0002.assertion_text": {"A0002": {"assertion_text": 5}},
+            "A0001.falsification_criteria": {
+                "A0001": {"falsification_criteria": "one string"}
+            },
+            "A0002.falsification_criteria": {
+                "A0002": {"falsification_criteria": ["ok", ""]}
+            },
+        }
+        for expected, assertions in cases.items():
+            with self.subTest(expected=expected):
+                self.write_inputs({"assertions": assertions}, "zzz\n")
+
+                self.assertIn(expected, self.run_refused())
+
+    def test_bad_evidence_text_is_refused(self) -> None:
+        self.write_inputs(
+            {"evidence_items": {"E0005": {"evidence_text": " "}}}, "zzz\n"
+        )
+
+        self.assertIn("E0005.evidence_text", self.run_refused())
+
+    def test_source_value_of_the_wrong_type_is_refused(self) -> None:
+        def break_source(extraction: dict) -> None:
+            extraction["assertions"][1]["falsification_criteria"] = None
+
+        self.set_source(break_source)
+
+        self.assertIn("A0002.falsification_criteria", self.run_refused())
+
+    def test_rewrite_entry_that_is_not_an_object_is_refused(self) -> None:
+        self.write_inputs({"assertions": {"A0001": "text"}}, "zzz\n")
+
+        self.assertIn("A0001", self.run_refused())
 
 
 if __name__ == "__main__":
