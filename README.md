@@ -154,6 +154,30 @@ Active workflow helper scripts should live under the owning skill directory.
 Do not treat a root-level `scripts/` directory as the default place for new workflow logic.
 The `paper-to-md` skill should be self-contained under `skills/paper-to-md/`.
 
+### Human review of the ground truth
+
+A researcher reviews a case's ground-truth assertions before any assertion-level scoring. `review_ground_truth.py packet` writes a Markdown sheet with one section per assertion (text, claim role, criticality, falsification criteria, linked evidence with quoted spans) and blank `decision:`, `criticality:` and `note:` lines. After the researcher fills it in, `sign` writes `ground_truth/<case>/csag/signoff.json`, pinned to the SHA-256 of `paper_extraction.json`:
+
+```bash
+uv run python skills/benchmark-scoring/scripts/review_ground_truth.py packet \
+  --case-dir ground_truth/<case> --out <sheet.md>
+uv run python skills/benchmark-scoring/scripts/review_ground_truth.py sign \
+  --case-dir ground_truth/<case> --sheet <sheet.md> --reviewer "<name>"
+```
+
+`sign` refuses a blank or unknown decision, and a sheet made from an older `paper_extraction.json`. Only a researcher signs; agents write the packet and never the sign-off.
+
+### Assertion-level scoring
+
+`score_assertions.py` scores candidate CSAGs against the signed ground truth: two judge models (`claude` and `codex` through their own logins) give each ground-truth assertion a verdict, and the scorer weights the verdicts by criticality. It refuses to run without a `signoff.json` that is valid for the current `paper_extraction.json` unless you pass `--allow-unsigned`, which marks every result provisional and records why. It also scores three anchors (the ground truth itself, an unrelated paper, a negated copy) and reports `"valid": false` when one is out of range.
+
+```bash
+uv run python skills/benchmark-scoring/scripts/score_assertions.py \
+  --case-dir ground_truth/<case> --candidate-dir <dir-of-candidate-csags> --out-dir <output-dir>
+```
+
+It writes `results.json`, `results.md` and `judgments/`, resumes from stored judge calls, and with `--cached-only` re-aggregates stored calls without a model call. `skills/benchmark-scoring/SKILL.md` has the judge command lines, isolation, score formula and known limits.
+
 ## CSAG Validation Profiles
 
 The CSAG validator is:
