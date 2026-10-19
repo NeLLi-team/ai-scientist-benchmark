@@ -48,3 +48,16 @@ Use the helper script:
 uv run python skills/benchmark-scoring/scripts/build_scoring_package.py \
   /abs/path/to/ground_truth/<case>
 ```
+
+## Scoring candidate CSAGs
+
+`scripts/score_csag_candidates.py` scores candidate `*_csag.json` files (with their `*_csag.validation.json`) against a case's scoring schema and writes ranked tables:
+
+```bash
+uv run python skills/benchmark-scoring/scripts/score_csag_candidates.py \
+  --case-dir ground_truth/<case> \
+  --candidate-dir <dir-of-candidate-csags> \
+  --out-dir <output-dir>
+```
+
+Known limits: its claim, method, entity, dataset, quantitative and limitation rules are hand-written for `06mega`, and it matches keywords as substrings over the flattened candidate CSAG text. Short tokens can match inside other words and negated statements still earn credit, so treat totals as a ranking rather than calibrated accuracy. Blinded candidates must be mapped back to original identifiers before scoring, because the dataset and entity rules look for the original IMG/M IDs.
