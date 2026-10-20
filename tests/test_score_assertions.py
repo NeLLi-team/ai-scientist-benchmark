@@ -262,6 +262,19 @@ class PacketTest(unittest.TestCase):
         self.assertNotIn(MARKER, packet.text)
         self.assertNotIn(MARKER, packet.candidate_text)
 
+    def test_negation_anchor_carries_only_the_denials(self) -> None:
+        candidate = candidate_csag([TEXTS["A0001"]], marker=MARKER)
+        evidence_text = candidate["evidence_items"][0]["evidence_text"]
+
+        negated = score_assertions._negated(candidate)
+        packet = assertion_grading.build_packet(REFERENCES, negated)
+
+        self.assertIn(score_assertions.NEGATION_PREFIX + TEXTS["A0001"], packet.text)
+        self.assertNotIn(evidence_text, packet.candidate_text)
+        self.assertEqual(negated["evidence_items"], [])
+        self.assertEqual(negated["evidence_links"], [])
+        self.assertEqual(len(candidate["evidence_items"]), 1)
+
 
 class ValidateVerdictsTest(unittest.TestCase):
     def setUp(self) -> None:

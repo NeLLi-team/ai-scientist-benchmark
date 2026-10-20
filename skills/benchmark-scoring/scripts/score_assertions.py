@@ -307,13 +307,16 @@ def _anchor_candidates(truth: GroundTruth, unrelated_path: Path) -> list[Candida
 
 
 def _negated(csag: dict) -> dict:
-    """A copy of the CSAG with assertions negated and supporting links flipped."""
+    """A copy of the CSAG that only denies each assertion.
+
+    Evidence is dropped: its text restates the reference findings, and a judge
+    could read the anchor's position from that evidence instead of the denials.
+    """
     negated = copy.deepcopy(csag)
     for assertion in negated["assertions"]:
         assertion["assertion_text"] = NEGATION_PREFIX + assertion["assertion_text"]
-    for link in negated.get("evidence_links", []):
-        if link.get("polarity") == "supports":
-            link["polarity"] = "refutes"
+    negated["evidence_items"] = []
+    negated["evidence_links"] = []
     return negated
 
 
